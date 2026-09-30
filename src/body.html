@@ -1,0 +1,284 @@
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="17" fill="none" stroke="var(--line)" stroke-width="5"></circle>
+        <path d="M20 3 A17 17 0 0 1 36.1 25.3" fill="none" stroke="var(--t2)" stroke-width="5"></path>
+        <path d="M20 3 A17 17 0 0 1 33.8 10.2" fill="none" stroke="var(--t3)" stroke-width="5"></path>
+        <line x1="20" y1="20" x2="30.5" y2="23.4" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round"></line>
+        <circle cx="20" cy="20" r="2.6" fill="var(--ink)"></circle>
+      </svg>
+      <div>
+        <h1>วงล้ออายุครรภ์</h1>
+        <p class="sub">คำนวณ GA และ EDC จาก LMP และอัลตราซาวด์</p>
+      </div>
+    </div>
+    <div class="today-chip" title="วันที่จากนาฬิกาของเครื่องนี้ ระบบตรวจทุก 30 วินาทีและทุกครั้งที่กลับมาที่หน้านี้">
+      <span class="pulse" aria-hidden="true"></span>
+      <span>วันนี้</span>
+      <strong id="today-text" class="num"></strong>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="โหมดการใช้งาน">
+    <button class="tab" role="tab" id="tab-clinic" aria-controls="panel-clinic" aria-selected="true">รายคน</button>
+    <button class="tab" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false">งานวิจัย (ไฟล์ Excel/CSV)</button>
+  </nav>
+
+  <main>
+    <section id="panel-clinic" role="tabpanel" aria-labelledby="tab-clinic">
+      <div class="clinic-grid">
+        <div class="inputs">
+          <fieldset class="block" id="blk-visit">
+            <legend>วันที่ตรวจ</legend>
+            <div class="field-row">
+              <div class="datefield">
+                <input id="visit-date" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-describedby="visit-echo" aria-label="วันที่ตรวจ">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="visit-date-picker" aria-label="เลือกวันที่ตรวจจากปฏิทิน">
+                </label>
+              </div>
+              <span class="chip live" id="visit-mode">วันนี้ อัปเดตเองทุกวัน</span>
+              <button type="button" class="btn small" id="visit-today" hidden>ใช้วันนี้</button>
+            </div>
+            <p class="echo" id="visit-echo"></p>
+          </fieldset>
+
+          <fieldset class="block" id="blk-lmp">
+            <legend>LMP <span class="hint">วันแรกของประจำเดือนครั้งสุดท้าย</span></legend>
+            <div class="field-row">
+              <div class="datefield">
+                <input id="lmp" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-describedby="lmp-echo" aria-label="LMP">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="lmp-picker" aria-label="เลือก LMP จากปฏิทิน">
+                </label>
+              </div>
+              <label class="uncertain" for="lmp-unknown">
+                <input type="checkbox" id="lmp-unknown">
+                <span>จำประจำเดือนไม่ได้</span>
+              </label>
+            </div>
+            <p class="echo" id="lmp-echo">พิมพ์ได้หลายแบบ เช่น 1/6/2569, 1.6.69, 01062569 หรือ 1 มิ.ย. 69</p>
+            <dl class="mini" id="lmp-out" hidden>
+              <div><dt>GA ตาม LMP ณ วันตรวจ</dt><dd id="lmp-ga"></dd></div>
+              <div><dt>EDC ตาม LMP</dt><dd id="lmp-edc"></dd></div>
+            </dl>
+          </fieldset>
+
+          <fieldset class="block" id="blk-us">
+            <legend>อัลตราซาวด์ <span class="hint">ถ้ามี ใส่ครั้งที่ใช้กำหนดอายุครรภ์</span></legend>
+            <div class="us-grid">
+              <div>
+                <span class="field-label" id="us-date-label">วันที่ทำ US</span>
+                <div class="datefield">
+                  <input id="us-date" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                    placeholder="วว/ดด/ปปปป" aria-labelledby="us-date-label" aria-describedby="us-echo">
+                  <label class="picker" title="เลือกจากปฏิทิน">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                    <input type="date" id="us-date-picker" aria-label="เลือกวันที่ทำ US จากปฏิทิน">
+                  </label>
+                </div>
+                <div class="quick"><button type="button" class="btn small" id="us-same">ใช้วันเดียวกับวันที่ตรวจ</button></div>
+                <p class="echo" id="us-echo"></p>
+              </div>
+              <div>
+                <span class="field-label" id="us-ga-label">GA จาก US</span>
+                <div class="wd" role="group" aria-labelledby="us-ga-label">
+                  <input id="us-w" type="text" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="สัปดาห์">
+                  <span>สัปดาห์</span>
+                  <input id="us-d" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="0" aria-label="วัน">
+                  <span>วัน</span>
+                </div>
+                <p class="echo" id="usga-echo"></p>
+              </div>
+            </div>
+            <dl class="mini" id="us-out" hidden>
+              <div><dt>GA ตาม US ณ วันตรวจ</dt><dd id="us-ga-visit"></dd></div>
+              <div><dt>EDC ตาม US</dt><dd id="us-edc"></dd></div>
+            </dl>
+          </fieldset>
+
+          <div class="actions">
+            <button type="button" class="btn" id="btn-example">ลองตัวอย่าง (มีผล US)</button>
+            <button type="button" class="btn" id="btn-clear">ล้างข้อมูลคนไข้</button>
+          </div>
+        </div>
+
+        <aside class="summary" aria-label="ผลการคำนวณ">
+          <div class="result" id="result">
+            <div class="result-head">
+              <svg class="wheel" id="wheel" viewBox="0 0 220 220" role="img" aria-labelledby="wheel-title">
+                <title id="wheel-title">วงล้ออายุครรภ์</title>
+              </svg>
+              <div class="ga-block" aria-live="polite" id="result-text">
+                <p class="res-label" id="res-label">อายุครรภ์ ณ วันที่ตรวจ</p>
+                <p class="ga-big" id="res-ga"></p>
+                <p class="res-sub" id="res-sub"></p>
+              </div>
+              <div class="edc-box" id="edc-box" aria-live="polite">
+                <p class="res-label">EDC ที่ใช้</p>
+                <p class="edc-date" id="res-edc"></p>
+                <p class="src-line" id="res-src"></p>
+              </div>
+            </div>
+            <div class="report" id="report" hidden>
+              <div class="report-head">
+                <span class="res-label">การรายงาน/บันทึก GA</span>
+                <button type="button" class="btn small" id="btn-copy-report">คัดลอก</button>
+              </div>
+              <p class="rep-line" id="report-line"></p>
+              <p class="report-edc" id="report-edc"></p>
+              <p class="report-key"><span class="rep-ga">ตัวแดง</span> คือ GA ณ วันที่ตรวจ เปลี่ยนทุกครั้งที่มา <span class="rep-date">ตัวม่วง</span> บอกวิธีกำหนดอายุครรภ์และ GA ตอนทำ U/S ไม่เปลี่ยนจนคลอด</p>
+              <span class="copy-status" id="report-copy-status" role="status"></span>
+            </div>
+            <div class="verdict" id="verdict" hidden></div>
+            <table class="compare" id="compare" hidden>
+              <thead><tr><th scope="col">วิธี</th><th scope="col">GA ณ วันตรวจ</th><th scope="col">EDC</th></tr></thead>
+              <tbody>
+                <tr id="cmp-lmp"><th scope="row">LMP</th><td></td><td></td></tr>
+                <tr id="cmp-us"><th scope="row">US</th><td></td><td></td></tr>
+              </tbody>
+            </table>
+            <div class="result-foot">
+              <label class="override" id="override-wrap" hidden>
+                <span>EDC ที่ใช้</span>
+                <select id="override">
+                  <option value="auto">ตามเกณฑ์</option>
+                  <option value="LMP">แพทย์เลือก LMP</option>
+                  <option value="US">แพทย์เลือก US</option>
+                </select>
+              </label>
+              <span>
+                <button type="button" class="btn small" id="btn-copy" hidden>คัดลอกสรุป</button>
+                <span class="copy-status" id="copy-status" role="status"></span>
+              </span>
+            </div>
+            <textarea id="copy-fallback" readonly hidden aria-label="ข้อความสรุปสำหรับคัดลอก"></textarea>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="panel-research" role="tabpanel" aria-labelledby="tab-research" hidden>
+      <p class="research-lead">
+        ใช้กับไฟล์ที่มีหลายราย ระบบใช้กฎเดียวกับหน้ารายคน แล้วเพิ่มคอลัมน์ผลลัพธ์ต่อท้ายคอลัมน์เดิม
+        <span class="privacy"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>คำนวณในเบราว์เซอร์นี้ ข้อมูลไม่ถูกส่งออกจากเครื่อง</span>
+      </p>
+      <ol class="steps">
+        <li class="step">
+          <h3>เลือกไฟล์</h3>
+          <div class="drop" id="drop">
+            <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv,.txt">
+            <label for="file" class="btn primary" id="file-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg>
+              เลือกไฟล์
+            </label>
+            <span>หรือลากไฟล์ .xlsx .xls .csv มาวางตรงนี้</span>
+            <button type="button" class="btn small" id="btn-template">ดาวน์โหลดไฟล์ตัวอย่าง (.csv)</button>
+          </div>
+          <p class="file-info" id="file-info"></p>
+          <div class="row">
+            <label class="ctl" id="sheet-wrap" hidden>ชีต<select id="sheet"></select></label>
+            <label class="ctl">แถวหัวตาราง<input id="header-row" type="number" min="1" step="1"></label>
+          </div>
+        </li>
+        <li class="step">
+          <h3>จับคู่คอลัมน์</h3>
+          <div class="map-grid">
+            <label class="ctl">LMP<select id="map-lmp"></select></label>
+            <label class="ctl">วันที่ทำ US<select id="map-usdate"></select></label>
+            <label class="ctl">รูปแบบ GA จาก US
+              <select id="map-gamode">
+                <option value="single">คอลัมน์เดียว เช่น 7+5</option>
+                <option value="wd">สัปดาห์และวันแยก 2 คอลัมน์</option>
+                <option value="days">จำนวนวัน เช่น 54</option>
+              </select>
+            </label>
+            <label class="ctl" id="wrap-ga">GA จาก US<select id="map-ga"></select></label>
+            <label class="ctl" id="wrap-gaw" hidden>GA จาก US (สัปดาห์)<select id="map-gaw"></select></label>
+            <label class="ctl" id="wrap-gad" hidden>GA จาก US (วัน)<select id="map-gad"></select></label>
+          </div>
+          <fieldset class="datecols">
+            <legend>คำนวณ GA ณ วันที่ในคอลัมน์เหล่านี้ (เลือกได้หลายคอลัมน์)</legend>
+            <div class="checks" id="map-datecols"></div>
+          </fieldset>
+          <details class="adv">
+            <summary>ตั้งค่าการอ่านข้อมูล</summary>
+            <div class="row">
+              <label class="ctl">ปีแบบ 2 หลัก
+                <select id="opt-2digit">
+                  <option value="BE">พ.ศ. (63 คือ 2563)</option>
+                  <option value="CE">ค.ศ. (20 คือ 2020)</option>
+                </select>
+              </label>
+              <label class="ctl">GA ที่เป็นทศนิยม เช่น 7.5
+                <select id="opt-decimal">
+                  <option value="reject">ไม่อ่าน แจ้งในหมายเหตุ</option>
+                  <option value="wd">7.5 คือ 7 สัปดาห์ 5 วัน</option>
+                  <option value="weeks">7.5 คือ 7.5 สัปดาห์ (ปัดเป็นวัน)</option>
+                </select>
+              </label>
+            </div>
+          </details>
+        </li>
+        <li class="step">
+          <h3>ตรวจผลและดาวน์โหลด</h3>
+          <div class="stats" id="stats"></div>
+          <div class="table-wrap"><table class="preview" id="preview"></table></div>
+          <p class="more" id="preview-more"></p>
+          <div class="row">
+            <button type="button" class="btn primary" id="dl-xlsx">ดาวน์โหลด .xlsx</button>
+            <button type="button" class="btn" id="dl-csv">ดาวน์โหลด .csv</button>
+            <span class="dl-status" id="dl-status" role="status"></span>
+          </div>
+          <details class="colguide">
+            <summary>ความหมายของคอลัมน์ที่เพิ่ม</summary>
+            <dl>
+              <dt>EDC_LMP, EDC_US</dt><dd>EDC จาก LMP (LMP + 280 วัน) และจาก US (วันที่ US + 280 วัน ลบ GA จาก US)</dd>
+              <dt>US_GA_days</dt><dd>GA จาก US เป็นจำนวนวัน</dd>
+              <dt>GA_LMP_at_US</dt><dd>GA ตาม LMP ณ วันที่ทำ US ใช้เลือกไตรมาสของเกณฑ์</dd>
+              <dt>EDC_US_minus_LMP_days</dt><dd>EDC_US ลบ EDC_LMP เป็นวัน ค่าบวกแปลว่าทารกวัดได้เล็กกว่าอายุครรภ์ตาม LMP</dd>
+              <dt>rule_band, rule_threshold_days</dt><dd>T1, T2, T3 และเกณฑ์ผลต่าง 7, 14, 21 วัน</dd>
+              <dt>EDC_final, EDC_final_BE</dt><dd>EDC ที่ใช้ตามเกณฑ์ (เป็นวันที่ และเป็นข้อความ พ.ศ.)</dd>
+              <dt>EDC_source</dt><dd>LMP, US, LMP_ONLY (ไม่มี US) หรือ US_ONLY (ไม่มี LMP)</dd>
+              <dt>GA_[คอลัมน์], GA_[คอลัมน์]_days</dt><dd>GA ณ วันที่ในคอลัมน์นั้น คำนวณจาก EDC_final</dd>
+              <dt>note</dt><dd>ข้อมูลที่อ่านไม่ได้หรือควรตรวจสอบ</dd>
+            </dl>
+            <p>ในไฟล์ .xlsx วันที่เป็นวันที่ของ Excel จัดรูปแบบ วว/ดด/ปปปป ค.ศ. ในไฟล์ .csv วันที่เป็นแบบ ปปปป-ดด-วว ค.ศ. ซึ่งนำเข้า Stata ด้วย date(var, "YMD") ได้ตรง</p>
+          </details>
+        </li>
+      </ol>
+    </section>
+  </main>
+
+  <section class="rules" id="rules" aria-label="เกณฑ์และที่มา">
+    <div>
+      <h2>เกณฑ์ที่ระบบใช้</h2>
+      <p>EDC จาก LMP คือ LMP + 280 วัน อายุครรภ์ ณ วันใด คือจำนวนวันนับจากวันเริ่มต้นของ EDC ที่ใช้ ไปถึงวันนั้น</p>
+      <p>ถ้ามีทั้ง LMP และ US ระบบเลือกแถวของเกณฑ์จาก GA ตาม LMP ณ วันที่ทำ US แล้วเทียบผลต่าง ถ้าเกินเกณฑ์ให้ยึด EDC จาก US</p>
+      <table class="bands">
+        <thead><tr><th scope="col">GA ตาม LMP ณ วันทำ US</th><th scope="col">ยึด US เมื่อต่างกันเกิน</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sw t1"></span>ไตรมาสแรก ถึง 13+6 สัปดาห์</td><td class="num">7 วัน</td></tr>
+          <tr><td><span class="sw t2"></span>ไตรมาสสอง 14+0 ถึง 27+6 สัปดาห์</td><td class="num">14 วัน</td></tr>
+          <tr><td><span class="sw t3"></span>ไตรมาสสาม 28+0 สัปดาห์ขึ้นไป</td><td class="num">21 วัน</td></tr>
+        </tbody>
+      </table>
+      <p>ผลต่างนับทั้งสองทิศ คือทารกเล็กกว่าหรือใหญ่กว่าอายุครรภ์ตาม LMP ผลต่างที่เท่ากับเกณฑ์พอดียังใช้ LMP</p>
+    </div>
+    <div>
+      <h2>ที่มา</h2>
+      <ul class="sources">
+        <li>EDC = LMP + 280 วัน การเลือกแถวตาม LMP และข้อควรระวังเมื่อ redate ในไตรมาสสาม: <a href="https://journals.lww.com/greenjournal/fulltext/2017/05000/committee_opinion_no_700__methods_for_estimating.50.aspx" target="_blank" rel="noopener">ACOG Committee Opinion No. 700: Methods for Estimating the Due Date</a>. Obstet Gynecol. 2017;129(5):e150-e154. doi:10.1097/AOG.0000000000002046 (reaffirmed 2022)</li>
+        <li>เกณฑ์ผลต่าง 7, 14 และ 21 วัน ตามแต่ละไตรมาส: กำหนดโดยผู้ใช้สำหรับแอปนี้ ตรงกับเอกสารการ Corrected date ทางสูติกรรม ไตรมาสสามใช้ตัวเลขเดียวกับ ACOG</li>
+        <li>รูปแบบการรายงาน/บันทึก GA (GA ... Wk by date = U/S at GA ... wk): เอกสารการสอน การ Corrected date ทางสูติกรรม เรียบเรียงโดยนิสิตแพทย์ชั้นปีที่ 4 (Elective สูติศาสตร์ เม.ย. 2566) ตรวจทานโดย อ.นพ.นิรทร ศรีสุโข</li>
+      </ul>
+      <p class="disclaimer">เครื่องมือช่วยคำนวณ ไม่ใช่เครื่องมือแพทย์และยังไม่ผ่านการรับรอง ผลลัพธ์ใช้ประกอบการตัดสินใจของแพทย์ ควรตรวจสอบวันที่ที่ป้อนทุกครั้ง หน้านี้ไม่เก็บข้อมูลคนไข้</p>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
