@@ -48,6 +48,8 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - Repo `niratorn/OBdating` (public), Pages serves branch `main`, folder `/ (root)`, so `index.html` at the root is the site.
 - `deploy.bat` on Windows: links the folder to the repo on first run (git init, fetch, reset --mixed origin/main), rebuilds `index.html` with Python when available, runs `node tests/core.test.js` and refuses to push on a failure, commits, pushes, then confirms that the remote `main` equals local HEAD. Everything goes to `deploy-log.txt` (gitignored), which an agent can read instead of asking for terminal output.
 - Never run git from the Linux sandbox that mounts this folder: that mirror can be stale or truncated. The first commit (2026-09-30) was pushed from a cloud session's own copy of these files.
+- Live since 2026-09-30: https://niratorn.github.io/OBdating/ (checked in a browser: page loads, example gives `GA 7+5 Wk by U/S ≠ date at GA 7+5 wk`).
+- Git for Windows was NOT installed on the user's PC on 2026-09-30, so `deploy.bat` stops at its first check. Until Git is installed, a Claude cloud session publishes updates: attach the repo with add_repo (push), copy the updated files into the clone, commit, push.
 
 ## Privacy
 No patient data in this folder, in a repo, or in a public URL. The sample data in the research tab is synthetic (A001 to A007).
