@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HrZisCxspO0wrxf8d1d4SnRKKyKpUPOf/lGYKZ+X4f8=' 'sha256-Chc08yRkGxstZQTka5MbGregSENRxFSn+H2vahnjJR8=' 'sha256-0gYfulAi7nHaRuZClQ4j+bqJ/kXpicnTyuPqSztbDlc='; style-src 'sha256-UvqH02HU7UR3NC5yhDGaiNF6dRSYPI986tHt7NJrwc4='; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-HrZisCxspO0wrxf8d1d4SnRKKyKpUPOf/lGYKZ+X4f8=' 'sha256-Chc08yRkGxstZQTka5MbGregSENRxFSn+H2vahnjJR8=' 'sha256-0gYfulAi7nHaRuZClQ4j+bqJ/kXpicnTyuPqSztbDlc='; style-src 'sha256-Ul+JD/kmqGvxsHJHqLBf/92APTHBdivWzDfVxPxUP38='; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
@@ -473,6 +473,8 @@ table.preview tr.st-warn td.note { color: var(--warn); }
 .sources li { margin: 4px 0; }
 .rules a { color: var(--accent); }
 .disclaimer { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); font-size: 0.88rem; color: var(--muted); }
+.disclaimer ul { margin: 0; padding-left: 18px; }
+.disclaimer li + li { margin-top: 4px; }
 
 /* Toast */
 .toast {
@@ -765,7 +767,7 @@ table.preview tr.st-warn td.note { color: var(--warn); }
   <section class="rules" id="rules" aria-label="เกณฑ์และที่มา">
     <div>
       <h2>เกณฑ์ที่ระบบใช้</h2>
-      <p>ถ้ามีทั้ง LMP และ US ระบบเลือกแถวของเกณฑ์จาก GA ตาม LMP ณ วันที่ทำ US แล้วเทียบผลต่าง ถ้าเกินเกณฑ์ให้ยึด EDC จาก US</p>
+      <p>ถ้ามีทั้ง LMP และ US ระบบเลือกเงื่อนไขตามเกณฑ์จาก GA ตาม LMP ณ วันที่ทำ US แล้วเปรียบเทียบผลต่าง ถ้าเกินเกณฑ์ให้ยึด EDC จาก US</p>
       <table class="bands">
         <thead><tr><th scope="col">GA ตาม LMP ณ วันทำ US</th><th scope="col">ยึด US เมื่อต่างกันเกิน</th></tr></thead>
         <tbody>
@@ -774,15 +776,20 @@ table.preview tr.st-warn td.note { color: var(--warn); }
           <tr><td><span class="sw t3"></span>ไตรมาสสาม 28+0 สัปดาห์ขึ้นไป</td><td class="num">21 วัน</td></tr>
         </tbody>
       </table>
-      <p>ผลต่างนับทั้งสองทิศ คือทารกเล็กกว่าหรือใหญ่กว่าอายุครรภ์ตาม LMP ผลต่างที่เท่ากับเกณฑ์พอดียังใช้ LMP</p>
+      <p>ผลต่างนับทั้งสองทิศ คือ ทารกเล็กกว่าหรือใหญ่กว่าอายุครรภ์ตาม LMP ส่วนผลต่างที่เท่ากับเกณฑ์พอดียังใช้ LMP</p>
     </div>
     <div>
       <h2>ที่มา</h2>
       <ul class="sources">
-        <li>EDC = LMP + 280 วัน การเลือกแถวตาม LMP และข้อควรระวังเมื่อ redate ในไตรมาสสาม: <a href="https://journals.lww.com/greenjournal/fulltext/2017/05000/committee_opinion_no_700__methods_for_estimating.50.aspx" target="_blank" rel="noopener">ACOG Committee Opinion No. 700: Methods for Estimating the Due Date</a>. Obstet Gynecol. 2017;129(5):e150-e154. doi:10.1097/AOG.0000000000002046 (reaffirmed 2022)</li>
+        <li>EDC = LMP + 280 วัน เงื่อนไขการแก้ไขอายุครรภ์เป็นไปตามตาราง และ การกำหนดอายุครรภ์ในไตรมาสสาม โดยเฉพาะคนไข้ late ANC ต้องคำนึงถึง IUGR (อายุครรภ์จาก LMP ถูกต้อง แต่ US พบทารกตัวเล็กมาก) เอกสารอ้างอิง <a href="https://journals.lww.com/greenjournal/fulltext/2017/05000/committee_opinion_no_700__methods_for_estimating.50.aspx" target="_blank" rel="noopener">ACOG Committee Opinion No. 700: Methods for Estimating the Due Date</a>. Obstet Gynecol. 2017;129(5):e150-e154. doi:10.1097/AOG.0000000000002046 (reaffirmed 2022)</li>
         <li>รูปแบบการรายงาน/บันทึก GA (GA ... Wk by date = U/S at GA ... wk): เอกสารการสอน การ Corrected date ทางสูติกรรม เรียบเรียงโดยนิสิตแพทย์ชั้นปีที่ 4 (Elective สูติศาสตร์ เม.ย. 2566) ตรวจทานโดย อ.นพ.นิรทร ศรีสุโข</li>
       </ul>
-      <p class="disclaimer">เครื่องมือช่วยคำนวณ ผลลัพธ์ใช้ประกอบการตัดสินใจของแพทย์ ควรตรวจสอบวันที่ที่ป้อนทุกครั้ง หน้านี้ไม่เก็บข้อมูลคนไข้</p>
+      <div class="disclaimer">
+        <ul>
+          <li>เครื่องมือนี้เป็นตัวช่วยคำนวณ โดยผลลัพธ์ที่ได้ ใช้ประกอบการตัดสินใจของแพทย์</li>
+          <li>ควรตรวจสอบวันที่ที่ป้อนทุกครั้งเพื่อป้องกันความคลาดเคลื่อน และ ระบบนี้ไม่มีการเก็บข้อมูลส่วนบุคคล</li>
+        </ul>
+      </div>
     </div>
   </section>
 </div>
