@@ -5,7 +5,7 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 
 ## วิธีเปิดใช้
 - เว็บจริง (GitHub Pages): https://niratorn.github.io/OBdating/ จาก repo public https://github.com/niratorn/OBdating
-- ดับเบิลคลิก `index.html` เปิดในเบราว์เซอร์ได้เลย ไม่ต้องติดตั้งอะไร ใช้ offline ได้ (ฟอนต์จะเป็นฟอนต์ของเครื่องเมื่อไม่มีเน็ต)
+- ดับเบิลคลิก `index.html` เปิดในเบราว์เซอร์ได้เลย ไม่ต้องติดตั้งอะไร ใช้ offline ได้ทั้งหมดรวมทั้งฟอนต์ โฟลเดอร์ `fonts/` ต้องอยู่ข้าง `index.html` (ถ้าแยกไปแต่ไฟล์เดียว หน้าเว็บยังใช้ได้ แต่ฟอนต์จะเป็นของเครื่อง)
 - อัปเดตเว็บ: แก้ไฟล์ใน `src/` แล้วดับเบิลคลิก `deploy.bat`
 
 ## Files (which one is real)
@@ -63,7 +63,8 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - index.html carries a Content-Security-Policy meta written by build.py: `default-src 'none'`, scripts only by SHA-256 hash of the three inline blocks, the style block by hash, fonts from 'self', `connect-src 'none'` (nothing can be sent out), and `base-uri`, `form-action`, `object-src` 'none'. Any change in src/ changes the hashes, so always rebuild with build.py. A hand edit of index.html silently breaks the page.
 - No inline `style="..."` attributes and no inline event handlers anywhere, because the policy blocks them. Use classes and addEventListener.
 - dist/artifact.html has no policy of its own (the claude.ai viewer applies one) and still loads Google Fonts and SheetJS from cdnjs.
-- The standalone page makes no network request at all. tests/e2e.py section 4 serves it over http and asserts: no external request, no policy violation in normal use (incl. Excel read and both downloads), self-hosted font loads, and fetch() to another site is blocked.
+- The standalone page makes no network request at all. tests/e2e.py section 4 serves it over http and asserts: no external request, no policy violation in normal use (incl. Excel read and both downloads), self-hosted font loads, and fetch() to another site is blocked. Fonts also load when index.html is opened from disk (file://, Chromium checked).
+- Live check after commit ec76e0e (2026-09-30, app's browser pane): policy present, every request went to niratorn.github.io only (7 font files), SheetJS 0.18.5 runs under the policy (synthetic .xlsx read in the research tab), example report line correct, no violation until a deliberate fetch() to another site, which was blocked.
 - Parsers refuse text longer than `MAX_INPUT_CHARS` (60) so a pathological cell cannot stall the regexes.
 - Nothing secret in the repo or its history; commits are authored by Claude noreply. Live headers: HTTPS with HSTS from GitHub Pages; GitHub Pages cannot send frame-ancestors or X-Frame-Options (low impact, no account actions on the page).
 - Not fixed: SheetJS 0.18.5 advisories (crafted files only, contained by the policy). Upgrading to 0.20.3 needs a manual download from cdn.sheetjs.com.
