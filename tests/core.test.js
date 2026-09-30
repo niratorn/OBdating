@@ -84,10 +84,63 @@ test('diff equals EDC_US minus EDC_LMP for many pairs', function () {
     }
   }
 });
-test('US before LMP is an error with no final EDC', function () {
-  var a = C.assessDating({ lmp: D(2026, 5, 1), usDate: D(2026, 4, 1), usGA: 60 });
-  assert.deepStrictEqual(a.errors, ['US_BEFORE_LMP']);
-  assert.strictEqual(a.edcFinal, null);
+/* ---------- LMP that cannot date the pregnancy (user decision 2026-09-30): use U/S, add a note ---------- */
+test('US before LMP (the phone case): LMP 1/9/2569, US 16/8/2569 at 12+0 gives 18+3 by U/S on 30/9/2569', function () {
+  var a = C.assessDating({ lmp: BE(1, 9, 2569), usDate: BE(16, 8, 2569), usGA: 12 * 7 });
+  assert.strictEqual(a.lmpConflict, 'US_BEFORE_LMP');
+  assert.strictEqual(C.LMP_CONFLICT_TEXT[a.lmpConflict], 'มีการ US ก่อน LMP');
+  assert.strictEqual(a.source, 'US');
+  assert.strictEqual(a.exceeds, true);
+  assert.strictEqual(a.band, null);
+  assert.strictEqual(a.t3Caution, false);
+  assert.strictEqual(a.edcFinal, a.edcUs);
+  assert.strictEqual(C.fmtDMYBE(a.edcFinal), '28/02/2570');
+  assert.strictEqual(C.fmtDMYBE(a.edcLmp), '08/06/2570');
+  assert.strictEqual(a.gaLmpAtUs, -16);
+  assert.strictEqual(a.diff, null);
+  assert.strictEqual(a.absDiff, null);
+  assert.strictEqual(a.edcUs - a.edcLmp, -100);
+  assert.strictEqual(C.fmtWD(C.gaOn(a.edcFinal, BE(30, 9, 2569))), '18+3');
+  assert.strictEqual(rl(BE(1, 9, 2569), BE(16, 8, 2569), 12 * 7, BE(30, 9, 2569)), 'GA 18+3 Wk by U/S ≠ date at GA 12+0 wk');
+});
+test('US before LMP: boundaries and odd values still date by U/S', function () {
+  var lmp = D(2026, 5, 1);
+  var same = C.assessDating({ lmp: lmp, usDate: lmp, usGA: 3 });          // U/S on the LMP day: normal rule
+  assert.strictEqual(same.lmpConflict, null);
+  assert.strictEqual(same.band.key, 'T1');
+  var dayBefore = C.assessDating({ lmp: lmp, usDate: lmp - 1, usGA: 3 });  // tiny discrepancy, still U/S
+  assert.strictEqual(dayBefore.lmpConflict, 'US_BEFORE_LMP');
+  assert.strictEqual(dayBefore.edcUs - dayBefore.edcLmp, -4);
+  assert.strictEqual(dayBefore.source, 'US');
+  var old = C.assessDating({ lmp: D(2026, 5, 1), usDate: D(2026, 4, 1), usGA: 60 });
+  assert.strictEqual(old.source, 'US');
+  assert.strictEqual(old.edcFinal, D(2026, 4, 1) + 220);
+});
+test('US before LMP with a third-trimester scan keeps the ACOG caution', function () {
+  var lmp = D(2026, 9, 1);
+  var a = C.assessDating({ lmp: lmp, usDate: lmp - 10, usGA: 30 * 7 });
+  assert.strictEqual(a.lmpConflict, 'US_BEFORE_LMP');
+  assert.strictEqual(a.t3Caution, true);
+  var b = C.assessDating({ lmp: lmp, usDate: lmp - 10, usGA: 27 * 7 + 6 });
+  assert.strictEqual(b.t3Caution, false);
+});
+test('LMP more than 44+6 weeks before the U/S: U/S with a note; 44+6 exactly is the normal rule', function () {
+  var us = BE(16, 8, 2569);
+  var a = C.assessDating({ lmp: BE(1, 6, 2568), usDate: us, usGA: 11 * 7 });   // LMP typed a year early
+  assert.strictEqual(a.lmpConflict, 'US_TOO_LATE');
+  assert.strictEqual(C.LMP_CONFLICT_TEXT[a.lmpConflict], 'GA ตาม LMP ณ วันทำ US เกิน 44+6 สัปดาห์');
+  assert.strictEqual(a.source, 'US');
+  assert.strictEqual(a.band, null);
+  assert.strictEqual(a.t3Caution, false);
+  assert.strictEqual(C.fmtDMYBE(a.edcFinal), '07/03/2570');
+  assert.strictEqual(C.fmtWD(C.gaOn(a.edcFinal, BE(30, 9, 2569))), '17+3');
+  assert.strictEqual(rl(BE(1, 6, 2568), us, 11 * 7, BE(30, 9, 2569)), 'GA 17+3 Wk by U/S ≠ date at GA 11+0 wk');
+  var edge = C.assessDating({ lmp: us - (44 * 7 + 6), usDate: us, usGA: 44 * 7 });
+  assert.strictEqual(edge.lmpConflict, null);
+  assert.strictEqual(edge.band.key, 'T3');
+  var over = C.assessDating({ lmp: us - (45 * 7), usDate: us, usGA: 44 * 7 });
+  assert.strictEqual(over.lmpConflict, 'US_TOO_LATE');
+  assert.strictEqual(over.source, 'US');
 });
 test('only LMP or only US', function () {
   assert.strictEqual(C.assessDating({ lmp: D(2026, 1, 1) }).source, 'LMP_ONLY');
@@ -420,6 +473,23 @@ test('batch: date before pregnancy and after 44 weeks produce notes', function (
   assert.strictEqual(r.gaAt[0].days, null);
   assert.ok(r.notes.join('|').indexOf('อยู่ก่อนเริ่มตั้งครรภ์') >= 0);
   assert.ok(r.notes.join('|').indexOf('เกิน 44 สัปดาห์') >= 0);
+});
+test('batch: U/S before LMP dates by U/S, notes it, leaves the band columns blank', function () {
+  var r = C.processRow(['A8', '01/09/2569', '30/09/2569', '16/08/2569', '12+0', ''], MAP, {});
+  assert.strictEqual(r.status, 'warn');
+  assert.strictEqual(r.dating.source, 'US');
+  assert.deepStrictEqual(r.notes, ['มีการ US ก่อน LMP']);
+  assert.strictEqual(C.fmtWD(r.gaAt[0].days), '18+3');
+  var cells = C.outputCells(r, 2);
+  var h = C.outputHeaders(['a', 'b']);
+  var col = function (name) { return cells[h.indexOf(name)].v; };
+  assert.strictEqual(col('GA_LMP_at_US'), '');
+  assert.strictEqual(col('EDC_US_minus_LMP_days'), '');
+  assert.strictEqual(col('rule_band'), '');
+  assert.strictEqual(col('rule_threshold_days'), '');
+  assert.strictEqual(col('EDC_final_BE'), '28/02/2570');
+  assert.strictEqual(col('EDC_source'), 'US');
+  assert.strictEqual(col('note'), 'มีการ US ก่อน LMP');
 });
 test('batch: weeks and days in two columns, and GA in days', function () {
   var m2 = { lmp: 0, usDate: 1, usGA: { mode: 'wd', wCol: 2, dCol: 3 }, dateCols: [] };

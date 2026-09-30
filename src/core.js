@@ -33,7 +33,8 @@
   ];
 
   // Data-entry guards (not clinical thresholds): values outside these are treated as typing errors.
-  var MAX_GA_DAYS = 44 * 7 + 6;   // latest GA accepted for an ultrasound entry
+  var MAX_GA_DAYS = 44 * 7 + 6;   // latest GA accepted for an ultrasound entry; an LMP more than
+                                  // this before the U/S cannot date the pregnancy (assessDating)
   var WARN_GA_DAYS = 44 * 7;      // GA on a date beyond this gets a "check the dates" note
 
   // Calendar conversion
@@ -368,6 +369,7 @@
 
   // input: { lmp: day|null, usDate: day|null, usGA: days|null }
   // source: 'LMP' | 'US' (rule applied), 'LMP_ONLY', 'US_ONLY', or null
+  // lmpConflict: 'US_BEFORE_LMP' | 'US_TOO_LATE' | null (see LMP_CONFLICT_TEXT)
   function assessDating(input) {
     var r = {
       lmp: input.lmp != null ? input.lmp : null,
@@ -375,21 +377,31 @@
       usGA: input.usGA != null ? input.usGA : null,
       edcLmp: null, edcUs: null, edcFinal: null, source: null,
       gaLmpAtUs: null, diff: null, absDiff: null, band: null, exceeds: null,
-      t3Caution: false, errors: []
+      t3Caution: false, lmpConflict: null
     };
     if (r.lmp != null) r.edcLmp = edcFromLMP(r.lmp);
     if (r.usDate != null && r.usGA != null) r.edcUs = edcFromUS(r.usDate, r.usGA);
 
     if (r.edcLmp != null && r.edcUs != null) {
       r.gaLmpAtUs = r.usDate - r.lmp;
-      if (r.gaLmpAtUs < 0) { r.errors.push('US_BEFORE_LMP'); return r; }
-      if (r.gaLmpAtUs > MAX_GA_DAYS) { r.errors.push('US_TOO_LATE'); return r; }
-      r.diff = r.gaLmpAtUs - r.usGA;      // equals edcUs - edcLmp; positive = ultrasound smaller than dates
-      r.absDiff = Math.abs(r.diff);
-      r.band = bandFor(r.gaLmpAtUs);
-      r.exceeds = r.absDiff > r.band.thresholdDays;
-      r.source = r.exceeds ? 'US' : 'LMP';
-      r.t3Caution = r.exceeds && r.band.key === 'T3';
+      if (r.gaLmpAtUs < 0 || r.gaLmpAtUs > MAX_GA_DAYS) {
+        // The LMP cannot date this pregnancy: the U/S was done before it, or more than
+        // 44+6 weeks after it. Decided by the user on 2026-09-30: date by U/S and show a
+        // note, never stop. No band and no discrepancy apply (the band is chosen by GA from
+        // LMP on the U/S date), so research files leave those columns blank for these rows.
+        // The ACOG third-trimester caution follows the U/S GA itself.
+        r.lmpConflict = r.gaLmpAtUs < 0 ? 'US_BEFORE_LMP' : 'US_TOO_LATE';
+        r.exceeds = true;
+        r.source = 'US';
+        r.t3Caution = trimesterOf(r.usGA) === 3;
+      } else {
+        r.diff = r.gaLmpAtUs - r.usGA;      // equals edcUs - edcLmp; positive = ultrasound smaller than dates
+        r.absDiff = Math.abs(r.diff);
+        r.band = bandFor(r.gaLmpAtUs);
+        r.exceeds = r.absDiff > r.band.thresholdDays;
+        r.source = r.exceeds ? 'US' : 'LMP';
+        r.t3Caution = r.exceeds && r.band.key === 'T3';
+      }
     } else if (r.edcLmp != null) {
       r.source = 'LMP_ONLY';
     } else if (r.edcUs != null) {
@@ -400,9 +412,11 @@
     return r;
   }
 
-  var ERROR_TEXT = {
-    US_BEFORE_LMP: 'วันที่ทำ US อยู่ก่อน LMP ตรวจสอบวันที่',
-    US_TOO_LATE: 'GA ตาม LMP ณ วันทำ US เกิน 44+6 สัปดาห์ ตรวจสอบวันที่'
+  // Note shown when the LMP cannot date this pregnancy and the U/S EDC is used instead.
+  // Wording of US_BEFORE_LMP is the user's own (2026-09-30).
+  var LMP_CONFLICT_TEXT = {
+    US_BEFORE_LMP: 'มีการ US ก่อน LMP',
+    US_TOO_LATE: 'GA ตาม LMP ณ วันทำ US เกิน 44+6 สัปดาห์'
   };
 
   var SOURCE_TEXT = {
@@ -422,6 +436,9 @@
    *   GA 11+2 Wk by U/S at GA 11+2 wk due to uncertain date   LMP not remembered (ticked)
    *   GA 11+2 Wk by U/S at GA 11+2 wk             no LMP entered, box not ticked
    *   GA 17+2 Wk by date                          LMP only, no U/S yet
+   * When the LMP cannot date the pregnancy (U/S before LMP, or more than 44+6 weeks
+   * after it) the U/S line is used: "GA 18+3 Wk by U/S ≠ date at GA 12+0 wk", and the
+   * page shows LMP_CONFLICT_TEXT beside it, not inside the line.
    * The GA after "Wk" (red in the handout) moves every visit. The dating part
    * (purple) names the method and the GA on the day of the dating U/S, taken from
    * the method in use, so it stays the same until delivery.
@@ -602,9 +619,9 @@
     if (usDate != null && usGA == null) notes.push('มีวันที่ US แต่ไม่มี GA จาก US');
 
     var a = assessDating({ lmp: lmp, usDate: usGA != null ? usDate : null, usGA: usDate != null ? usGA : null });
-    a.errors.forEach(function (e) { notes.push(ERROR_TEXT[e]); });
+    if (a.lmpConflict) notes.push(LMP_CONFLICT_TEXT[a.lmpConflict]);
     if (a.t3Caution) notes.push('Redate ในไตรมาสสาม ระวังทารกโตช้า (ACOG)');
-    if (a.edcFinal == null && !a.errors.length) notes.push('ไม่มีข้อมูลพอคำนวณ EDC');
+    if (a.edcFinal == null) notes.push('ไม่มีข้อมูลพอคำนวณ EDC');
 
     var gaAt = (mapping.dateCols || []).map(function (c) {
       var v = row[c];
@@ -670,7 +687,7 @@
     normalizeDigits: normalizeDigits, parseDateText: parseDateText, parseDateValue: parseDateValue,
     parseGA: parseGA, gaFromWD: gaFromWD,
     edcFromLMP: edcFromLMP, edcFromUS: edcFromUS, gaOn: gaOn, bandFor: bandFor,
-    assessDating: assessDating, ERROR_TEXT: ERROR_TEXT, SOURCE_TEXT: SOURCE_TEXT, T3_CAUTION: T3_CAUTION,
+    assessDating: assessDating, LMP_CONFLICT_TEXT: LMP_CONFLICT_TEXT, SOURCE_TEXT: SOURCE_TEXT, T3_CAUTION: T3_CAUTION,
     reportLine: reportLine, naegeleEDC: naegeleEDC, checkBookEDC: checkBookEDC,
     decodeText: decodeText, parseCSV: parseCSV, toCSV: toCSV,
     processRow: processRow, outputHeaders: outputHeaders, outputCells: outputCells,

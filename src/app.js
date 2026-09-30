@@ -318,23 +318,19 @@
     var ga = null;
     if (final == null) {
       $('edc-box').hidden = true;
-      if (a.errors.length) {
-        gaEl.innerHTML = '<span class="empty-note">คำนวณไม่ได้</span>';
-        sub.textContent = 'ข้อมูล LMP กับ US ขัดกัน';
+      if (state.lmpUnknown) {
+        gaEl.innerHTML = '<span class="empty-note">ใส่ผล U/S</span>';
+        sub.textContent = 'จำประจำเดือนไม่ได้ ต้องใช้ U/S กำหนดอายุครรภ์';
       } else {
-        if (state.lmpUnknown) {
-          gaEl.innerHTML = '<span class="empty-note">ใส่ผล U/S</span>';
-          sub.textContent = 'จำประจำเดือนไม่ได้ ต้องใช้ U/S กำหนดอายุครรภ์';
-        } else {
-          gaEl.innerHTML = '<span class="empty-note">ใส่ LMP หรือผล US</span>';
-          sub.textContent = 'ผล GA, EDC และการเทียบ LMP กับ US จะขึ้นตรงนี้';
-        }
+        gaEl.innerHTML = '<span class="empty-note">ใส่ LMP หรือผล US</span>';
+        sub.textContent = 'ผล GA, EDC และการเทียบ LMP กับ US จะขึ้นตรงนี้';
       }
     } else {
       $('edc-box').hidden = false;
       $('res-edc').textContent = C.fmtThai(final, true);
       var srcText = manual ? 'ตาม ' + source + ' (แพทย์เลือกเอง)'
-        : (source === 'US_ONLY' && state.lmpUnknown ? 'ตาม U/S (จำประจำเดือนไม่ได้)' : SOURCE_LABEL[source]);
+        : (source === 'US_ONLY' && state.lmpUnknown ? 'ตาม U/S (จำประจำเดือนไม่ได้)'
+          : (a.lmpConflict ? 'ตาม US (' + C.LMP_CONFLICT_TEXT[a.lmpConflict] + ')' : SOURCE_LABEL[source]));
       var countText = '';
       if (v != null) {
         var left = final - v;
@@ -364,10 +360,15 @@
     }
 
     // Verdict: only when both LMP and US are present
-    if (a.errors.length) {
+    if (a.lmpConflict) {
+      // LMP cannot date this pregnancy: U/S is used, with the note the user asked for
       verdict.hidden = false;
-      verdict.className = 'verdict error';
-      verdict.innerHTML = '<h3>ตรวจสอบวันที่</h3><p>' + esc(a.errors.map(function (e) { return C.ERROR_TEXT[e]; }).join(' ')) + '</p>';
+      verdict.className = 'verdict redate';
+      var note = '<h3>ใช้ EDC จาก US</h3>' +
+        '<p class="caution">หมายเหตุ: ' + esc(C.LMP_CONFLICT_TEXT[a.lmpConflict]) + '</p>' +
+        '<p>วันที่ทำ US ' + esc(C.fmtThai(a.usDate, true)) + ' GA จาก US ' + C.fmtWD(a.usGA) + ' สัปดาห์ · LMP ' + esc(C.fmtThai(a.lmp, true)) + '</p>';
+      if (a.t3Caution) note += '<p class="caution">' + esc(C.T3_CAUTION) + '</p>';
+      verdict.innerHTML = note;
     } else if (both) {
       verdict.hidden = false;
       verdict.className = 'verdict ' + (a.exceeds ? 'redate' : 'keep');
@@ -392,7 +393,7 @@
       fillCompare(rows.US, gaU, a.edcUs, final === a.edcUs && (source === 'US' || source === 'US_ONLY'));
     }
 
-    var report = a.errors.length ? null : C.reportLine(a, v, source, { uncertainDate: state.lmpUnknown });
+    var report = C.reportLine(a, v, source, { uncertainDate: state.lmpUnknown });
     renderReport(a, report, source);
 
     drawNeedle(ga, final != null && ga == null && v != null);
@@ -582,6 +583,7 @@
       lines.push('ผลต่าง ' + a.absDiff + ' วัน (' + a.band.name + ' เกณฑ์เกิน ' + a.band.thresholdDays + ' วัน) ' +
         (a.exceeds ? 'ใช้ EDC จาก US' : 'ใช้ EDC จาก LMP') + (s.manual ? ' แพทย์เลือก ' + s.source + ' เอง' : ''));
     }
+    if (a.lmpConflict) lines.push('หมายเหตุ: ' + C.LMP_CONFLICT_TEXT[a.lmpConflict] + ' ใช้ EDC จาก US');
     lines.push('EDC ที่ใช้ ' + C.fmtDMYBE(s.final) + (s.ga != null ? ' GA ณ วันตรวจ ' + C.fmtWD(s.ga) + ' wk' : ''));
     if (state.bookEdc != null) {
       var bg = v != null ? C.gaOn(state.bookEdc, v) : null;
@@ -987,14 +989,15 @@
       var nonEmpty = R.results.filter(function (it) { return it.res.status !== 'empty'; });
       var ok = nonEmpty.filter(function (it) { return it.res.dating && it.res.dating.edcFinal != null; });
       var us = ok.filter(function (it) { return it.res.dating.source === 'US'; });
-      var byBand = { T1: 0, T2: 0, T3: 0 };
-      us.forEach(function (it) { byBand[it.res.dating.band.key]++; });
+      var byBand = { T1: 0, T2: 0, T3: 0 }, lmpUnusable = 0;
+      us.forEach(function (it) { var b = it.res.dating.band; if (b) byBand[b.key]++; else lmpUnusable++; });
       var notes = nonEmpty.filter(function (it) { return it.res.notes && it.res.notes.length; });
       var err = nonEmpty.filter(function (it) { return it.res.status === 'error'; });
       $('stats').innerHTML =
         stat('แถวข้อมูล', nonEmpty.length.toLocaleString('th-TH')) +
         stat('คำนวณ EDC ได้', ok.length.toLocaleString('th-TH')) +
-        stat('ยึด US ตามเกณฑ์', us.length.toLocaleString('th-TH'), 'T1 ' + byBand.T1 + ' · T2 ' + byBand.T2 + ' · T3 ' + byBand.T3) +
+        stat('ยึด US ตามเกณฑ์', us.length.toLocaleString('th-TH'), 'T1 ' + byBand.T1 + ' · T2 ' + byBand.T2 + ' · T3 ' + byBand.T3 +
+          (lmpUnusable ? ' · LMP ใช้ไม่ได้ ' + lmpUnusable : '')) +
         stat('มีหมายเหตุ', notes.length.toLocaleString('th-TH'), err.length ? 'คำนวณไม่ได้ ' + err.length : '');
     }
 

@@ -176,14 +176,32 @@ with sync_playwright() as p:
     check("T3 redate", "เกินเกณฑ์ ใช้ EDC จาก US" in v and "ไตรมาสสาม" in v, v)
     check("T3 caution", "growth restriction" in v, v)
 
-    # US before LMP
+    # U/S before LMP (the phone case, user decision 2026-09-30): dates by U/S with a note, never stops
     page.click("#btn-clear")
-    fill_date(page, "#lmp", "01/06/2569")
-    fill_date(page, "#us-date", "01/05/2569")
-    page.fill("#us-w", "8"); page.locator("#us-w").blur()
-    check("US before LMP error", "ตรวจสอบวันที่" in text(page, "#verdict"))
-    check("no EDC on conflict", "คำนวณไม่ได้" in text(page, "#res-ga"))
-    check("no report on conflict", report(page) is None)
+    fill_date(page, "#lmp", "01/09/2569")
+    fill_date(page, "#us-date", "16/08/2569")
+    page.fill("#us-w", "12"); page.fill("#us-d", "0"); page.locator("#us-d").blur()
+    check("US before LMP GA 18+3", text(page, "#res-ga").replace("\n", "").replace(" ", "") == "18สัปดาห์3วัน", text(page, "#res-ga"))
+    check("US before LMP EDC", text(page, "#res-edc") == "อา. 28 ก.พ. 2570", text(page, "#res-edc"))
+    v = text(page, "#verdict")
+    check("US before LMP note", "หมายเหตุ: มีการ US ก่อน LMP" in v and "ใช้ EDC จาก US" in v, v)
+    check("US before LMP shows both dates", "อา. 16 ส.ค. 2569" in v and "อ. 1 ก.ย. 2569" in v, v)
+    check("US before LMP source label", "US ก่อน LMP" in text(page, "#res-src"), text(page, "#res-src"))
+    check("US before LMP report", report(page) == "GA 18+3 Wk by U/S ≠ date at GA 12+0 wk", str(report(page)))
+    check("no override when LMP cannot date", not page.locator("#override-wrap").is_visible())
+    check("US row chosen on conflict", "chosen" in (page.get_attribute("#cmp-us", "class") or ""))
+    page.click("#btn-copy")
+    page.wait_for_timeout(100)
+    clip = page.evaluate("navigator.clipboard.readText()")
+    check("copy carries the note", clip.split("\n")[0] == "GA 18+3 Wk by U/S ≠ date at GA 12+0 wk"
+          and "หมายเหตุ: มีการ US ก่อน LMP ใช้ EDC จาก US" in clip, clip)
+
+    # LMP typed a year early: more than 44+6 weeks before the U/S, same handling
+    fill_date(page, "#lmp", "01/06/2568")
+    page.fill("#us-w", "11"); page.fill("#us-d", "0"); page.locator("#us-d").blur()
+    v = text(page, "#verdict")
+    check("LMP beyond 44+6 note", "เกิน 44+6" in v and "ใช้ EDC จาก US" in v, v)
+    check("LMP beyond 44+6 report", report(page) == "GA 17+3 Wk by U/S ≠ date at GA 11+0 wk", str(report(page)))
 
     # invalid date message
     page.click("#btn-clear")
@@ -328,6 +346,24 @@ with sync_playwright() as p:
     check("cp874 decoded", "Windows-874" in info, info)
     prev = text(page, "#preview")
     check("cp874 header Thai", "เลขที่" in prev and "17+2" in prev, prev)
+
+    # ---- a file with a U/S done before the LMP: U/S EDC, note, stats say so (user decision 2026-09-30)
+    cfl = OUT / "conflict.csv"
+    cfl.write_text("ID,LMP,US date,US GA,วันที่ตรวจ\r\nC1,01/09/2569,16/08/2569,12+0,30/09/2569\r\n"
+                   "C2,01/07/2563,01/09/2563,7+5,01/09/2563\r\n", encoding="utf-8")
+    page.set_input_files("#file", str(cfl))
+    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'conflict.csv'")
+    stats = text(page, "#stats")
+    check("conflict row counted as US", "ยึด US ตามเกณฑ์\n2" in stats and "LMP ใช้ไม่ได้ 1" in stats, stats)
+    prev = text(page, "#preview")
+    check("conflict row previewed with note", "มีการ US ก่อน LMP" in prev and "28/02/2570" in prev and "18+3" in prev, prev)
+    with page.expect_download() as dl:
+        page.click("#dl-csv")
+    cpath = OUT / "conflict_out.csv"
+    dl.value.save_as(cpath)
+    crow = list(csv.DictReader(io.StringIO(cpath.read_text(encoding="utf-8-sig"))))[0]
+    check("csv conflict row", crow["EDC_source"] == "US" and crow["EDC_final_BE"] == "28/02/2570"
+          and crow["rule_band"] == "" and crow["EDC_US_minus_LMP_days"] == "" and crow["note"] == "มีการ US ก่อน LMP", str(crow))
     page.set_viewport_size({"width": 390, "height": 844})
     page.screenshot(path=str(OUT / "research-phone.png"), full_page=True)
     sw = page.evaluate("document.documentElement.scrollWidth")
