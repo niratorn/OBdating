@@ -17,6 +17,8 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - `tests/core.test.js`: known-answer tests, `node tests/core.test.js` (no packages needed).
 - `tests/e2e.py`: browser tests incl. mocked clock rollover, `python tests/e2e.py` (needs `playwright` and `openpyxl`).
 - `vendor/`: SheetJS Community Edition 0.18.5 (Apache 2.0) and its licence.
+- `fonts/`: self-hosted IBM Plex Sans Thai 400/500/600 and Trirong 500/600 (thai, latin, latin-ext subsets) from Fontsource 5.3.0, SIL OFL 1.1 licences included. `fonts/fonts.css` is inlined into index.html by build.py.
+- `tests/fixtures/dates.json`: 1544 date cases computed with Python datetime (independent of our JS), incl. every day around 29 Feb.
 - `deploy.bat`: the only way to publish. `.nojekyll`, `.gitignore`, `.gitattributes`, `README.md` belong to the GitHub repo.
 
 ## Clinical rules (read the constants in src/core.js, never quote from memory)
@@ -45,6 +47,7 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - Code: `naegeleEDC()` and `checkBookEDC()` in src/core.js. Tests: the screenshot case (LMP 06/08/2569, U/S 01/09/2569 11+0, book 13/05/2570 vs 23/03/2570) in both test files.
 
 ## Behaviour that must not regress
+- Leap years: dates are converted to C.E. before any arithmetic, so B.E. 2567 (2024) counts 29 Feb although 2567 is not divisible by 4; 29/02/2566 is rejected; 2100 (B.E. 2643) is not leap. Guarded by the fixture test.
 - "Today" follows the device clock. Re-checked every 30 s, on visibilitychange, focus, pageshow, and by a timer at local midnight. In "today" mode the visit date moves with it; a typed visit date stays fixed. Focusing the visit field without typing must not switch it to fixed. Covered by tests/e2e.py (clock 30 Sep 2569 23:58 rolls to 1 Oct).
 - Dates are integer day numbers, no time zones. Input accepts B.E. and C.E., Thai month names, Thai digits, 8 digits (01092563), Excel serials, and B.E. years typed into a non-Thai Excel (year 2563 stored as C.E.). Two-digit years mean B.E. unless changed in the research settings.
 - Research files are read and written in the browser only. Output .xlsx keeps the original sheet and adds columns to the right; .csv uses ISO dates (Stata: date(var, "YMD")).
@@ -56,10 +59,20 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - Live since 2026-09-30: https://niratorn.github.io/OBdating/ (checked in a browser: page loads, example gives `GA 7+5 Wk by U/S ≠ date at GA 7+5 wk`).
 - Git for Windows was NOT installed on the user's PC on 2026-09-30, so `deploy.bat` stops at its first check. Until Git is installed, a Claude cloud session publishes updates: attach the repo with add_repo (push), copy the updated files into the clone, commit, push.
 
+## Security (reviewed 2026-09-30)
+- index.html carries a Content-Security-Policy meta written by build.py: `default-src 'none'`, scripts only by SHA-256 hash of the three inline blocks, the style block by hash, fonts from 'self', `connect-src 'none'` (nothing can be sent out), and `base-uri`, `form-action`, `object-src` 'none'. Any change in src/ changes the hashes, so always rebuild with build.py. A hand edit of index.html silently breaks the page.
+- No inline `style="..."` attributes and no inline event handlers anywhere, because the policy blocks them. Use classes and addEventListener.
+- dist/artifact.html has no policy of its own (the claude.ai viewer applies one) and still loads Google Fonts and SheetJS from cdnjs.
+- The standalone page makes no network request at all. tests/e2e.py section 4 serves it over http and asserts: no external request, no policy violation in normal use (incl. Excel read and both downloads), self-hosted font loads, and fetch() to another site is blocked.
+- Parsers refuse text longer than `MAX_INPUT_CHARS` (60) so a pathological cell cannot stall the regexes.
+- Nothing secret in the repo or its history; commits are authored by Claude noreply. Live headers: HTTPS with HSTS from GitHub Pages; GitHub Pages cannot send frame-ancestors or X-Frame-Options (low impact, no account actions on the page).
+- Not fixed: SheetJS 0.18.5 advisories (crafted files only, contained by the policy). Upgrading to 0.20.3 needs a manual download from cdn.sheetjs.com.
+- Account notes for the owner: the Claude app's browser pane stays signed in to GitHub; the Claude GitHub connection can push to every repo; use the GitHub noreply email once Git is installed.
+
 ## Privacy
 No patient data in this folder, in a repo, or in a public URL. The sample data in the research tab is synthetic (A001 to A007).
 
 ## Known limits
-- SheetJS 0.18.5 is the newest version on npm and cdnjs. It has 2 advisories that apply only to crafted files: GHSA-4r6h-8v6p-xvw6 (prototype pollution, fixed 0.19.3) and GHSA-5pgg-2g8v-p4x9 (ReDoS, fixed 0.20.2). Newer builds are only on cdn.sheetjs.com. Risk is low because the files are the user's own exports processed locally.
+- SheetJS 0.18.5 is the newest version on npm and cdnjs. It has 2 advisories that apply only to crafted files: GHSA-4r6h-8v6p-xvw6 (prototype pollution, fixed 0.19.3) and GHSA-5pgg-2g8v-p4x9 (ReDoS, fixed 0.20.2). Newer builds are only on cdn.sheetjs.com. Risk is low because the files are the user's own exports processed locally, and the Content-Security-Policy stops any data from leaving the page.
 - Not a medical device. Keep the disclaimer.
 - The public page keeps `<meta name="robots" content="noindex, nofollow">`, which is what keeps it out of search results. A robots.txt only counts at the domain root (niratorn.github.io/robots.txt), so one inside this project would do nothing. The public repo page on github.com itself can still be indexed.

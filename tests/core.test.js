@@ -269,6 +269,51 @@ test('Excel cell values: serials, B.E. serials, 1904 system, lost leading zero',
   assert.strictEqual(pv(54), 'ERR');
 });
 
+test('very long text is refused fast (no regex blow-up)', function () {
+  var t0 = Date.now();
+  assert.strictEqual(pd(new Array(5001).join('ก ')), 'ERR');
+  assert.strictEqual(pd('1 ' + new Array(3001).join(' x') + ' 2563'), 'ERR');
+  assert.strictEqual(pg(new Array(5001).join('7 ')), 'ERR');
+  assert.ok(Date.now() - t0 < 200, 'took ' + (Date.now() - t0) + ' ms');
+  assert.strictEqual(C.parseDateText('01/09/2563 00:00:00').ok, true);   // normal inputs still fine
+});
+
+/* ---------- Leap years (B.E. 2567 = 2024, B.E. 2563 = 2020 are leap; 2567 is not divisible by 4) ---------- */
+test('leap year: EDC and GA across 29 February', function () {
+  assert.strictEqual(C.fmtDMYBE(C.edcFromLMP(BE(1, 2, 2567))), '07/11/2567');   // leap year
+  assert.strictEqual(C.fmtDMYBE(C.edcFromLMP(BE(1, 2, 2566))), '08/11/2566');   // one day later in a normal year
+  assert.strictEqual(C.fmtDMYBE(C.edcFromLMP(BE(29, 2, 2567))), '05/12/2567');  // LMP on 29 Feb itself
+  assert.strictEqual(BE(15, 3, 2567) - BE(15, 1, 2567), 60);                   // 8+4 across a leap February
+  assert.strictEqual(BE(15, 3, 2566) - BE(15, 1, 2566), 59);                   // 8+3 in a normal year
+  assert.strictEqual(C.fmtDMYBE(C.edcFromUS(BE(20, 1, 2567), 8 * 7)), '31/08/2567');
+});
+test('leap year: 29 February accepted only in real leap years, B.E. or C.E.', function () {
+  assert.strictEqual(pd('29/02/2567'), '2024-02-29');
+  assert.strictEqual(pd('29/02/2563'), '2020-02-29');
+  assert.strictEqual(pd('29/02/2543'), '2000-02-29');   // 2000 is leap (divisible by 400)
+  assert.strictEqual(pd('29/02/2566'), 'ERR');
+  assert.strictEqual(pd('29/02/2643'), 'ERR');          // 2100 is not leap
+  assert.strictEqual(pd('29 ก.พ. 67'), '2024-02-29');
+  assert.strictEqual(pv(45351), '2024-02-29');         // Excel serial
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2023, 5, 24))), '2024-02-29');  // 31 Feb clamps to 29 Feb in a leap year
+  assert.strictEqual(C.localToday(new Date(2028, 1, 29, 0, 0, 1)), D(2028, 2, 29));
+});
+test('1544 date cases match Python datetime (tests/fixtures/dates.json)', function () {
+  var cases = require('./fixtures/dates.json');
+  var bad = 0;
+  cases.forEach(function (c) {
+    var lmp = C.parseDateText(c.lmp).day, visit = C.parseDateText(c.visit).day, us = C.parseDateText(c.usDate).day;
+    var edcUs = C.edcFromUS(us, c.usGA);
+    if (visit - lmp !== c.gaDays || C.fmtDMYBE(C.edcFromLMP(lmp)) !== c.edcLmp ||
+        C.fmtDMYBE(edcUs) !== c.edcUs || C.gaOn(edcUs, visit) !== c.gaByUsAtVisit) {
+      bad++;
+      if (bad < 5) console.log('  mismatch', JSON.stringify(c));
+    }
+  });
+  assert.strictEqual(bad, 0);
+  assert.ok(cases.length > 1500);
+});
+
 /* ---------- GA parsing ---------- */
 test('GA text formats', function () {
   assert.strictEqual(pg('7+5'), 54);

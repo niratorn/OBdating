@@ -44,6 +44,7 @@
                                   // so small numbers such as GA weeks (e.g. 11) are never taken as dates
 
   var MS_PER_DAY = 86400000;
+  var MAX_INPUT_CHARS = 60;       // longer text is never a date or GA; refusing it keeps the regexes fast
   var EXCEL_EPOCH_OFFSET = 25569; // Excel serial of 1970-01-01 (1900 date system)
   var EXCEL_1904_SHIFT = 1462;    // days between the 1900 and 1904 date systems
   var EXCEL_MAX_SERIAL = 2958465; // 9999-12-31
@@ -203,8 +204,10 @@
   function parseDateText(raw, opts) {
     opts = opts || {};
     if (raw == null) return { ok: false, empty: true };
+    if (String(raw).length > MAX_INPUT_CHARS * 4) return badDate('ข้อความยาวเกินไป');
     var s = normalizeDigits(raw).replace(/[ \s]+/g, ' ').trim();
     if (!s) return { ok: false, empty: true };
+    if (s.length > MAX_INPUT_CHARS) return badDate('ข้อความยาวเกินไป');
 
     var eraHint = null;
     if (/พ\s?\.?\s?ศ\s?\.?/.test(s)) { eraHint = 'BE'; s = s.replace(/พ\s?\.?\s?ศ\s?\.?/g, ' '); }
@@ -315,7 +318,9 @@
       if (isInt(raw)) return okGA(raw * 7);
       raw = String(raw);
     }
+    if (String(raw).length > MAX_INPUT_CHARS * 4) return { ok: false, error: 'ข้อความยาวเกินไป' };
     var s = normalizeDigits(raw).toLowerCase().replace(/[ \s]+/g, ' ').trim();
+    if (s.length > MAX_INPUT_CHARS) return { ok: false, error: 'ข้อความยาวเกินไป' };
     s = s.replace(/^(ga|us|u\/s|by|อายุครรภ์|:|\s)+/g, '').replace(/\s*(by us|by u\/s|us)$/g, '').trim();
     if (!s) return { ok: false, empty: true };
     var m;

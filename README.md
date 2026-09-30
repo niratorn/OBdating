@@ -13,3 +13,5 @@
 แก้ไฟล์ใน `src/` แล้วดับเบิลคลิก `deploy.bat` ไฟล์นี้สร้าง `index.html` ใหม่ รันการทดสอบ แล้ว push ขึ้น GitHub ผลการทำงานอยู่ใน `deploy-log.txt`
 
 SheetJS Community Edition 0.18.5 อยู่ใน `vendor/` ภายใต้ Apache License 2.0
+
+ฟอนต์ IBM Plex Sans Thai และ Trirong อยู่ใน `fonts/` ภายใต้ SIL Open Font License 1.1 หน้าเว็บจึงไม่ติดต่อเว็บภายนอก

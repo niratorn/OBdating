@@ -131,6 +131,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .echo { margin: 6px 0 0; font-size: 0.9rem; color: var(--muted); min-height: 1.4em; }
 .echo.ok { color: var(--ink); }
 .echo.err { color: var(--err); }
+.err-text { color: var(--err); }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 500; white-space: nowrap; }
 .chip.live { background: var(--ok-soft); color: var(--ok); }

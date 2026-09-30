@@ -748,7 +748,7 @@
         }
         var X = window.XLSX;
         if (!X) {
-          info.innerHTML = '<span style="color:var(--err)">ยังโหลดตัวอ่าน Excel ไม่ได้ ตรวจการเชื่อมต่ออินเทอร์เน็ต หรือบันทึกไฟล์เป็น .csv แล้วลองใหม่</span>';
+          info.innerHTML = '<span class="err-text">ยังโหลดตัวอ่าน Excel ไม่ได้ ตรวจการเชื่อมต่ออินเทอร์เน็ต หรือบันทึกไฟล์เป็น .csv แล้วลองใหม่</span>';
           return;
         }
         var wb = X.read(new Uint8Array(buf), { type: 'array', cellNF: true, cellDates: false, cellText: true });
@@ -760,7 +760,7 @@
         });
         setSource({ kind: 'xlsx', name: base, fileName: file.name, wb: wb, date1904: date1904, sheets: sheets });
       }).catch(function (e) {
-        info.innerHTML = '<span style="color:var(--err)">อ่านไฟล์ไม่ได้: ' + esc(e && e.message ? e.message : String(e)) + '</span>';
+        info.innerHTML = '<span class="err-text">อ่านไฟล์ไม่ได้: ' + esc(e && e.message ? e.message : String(e)) + '</span>';
       });
     }
 
