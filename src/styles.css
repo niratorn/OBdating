@@ -166,6 +166,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mini dd small { font-weight: 400; color: var(--muted); font-size: 0.8rem; }
 .mini .warn-text { color: var(--err); font-weight: 500; font-size: 0.9rem; }
 
+.book-ok { color: var(--ok); }
+.book-warn { color: var(--warn); }
+.book-note { display: block; margin-top: 2px; font-size: 0.8rem; font-weight: 400; color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Result card */

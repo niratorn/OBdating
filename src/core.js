@@ -454,6 +454,32 @@
   }
 
   /* ------------------------------------------------------------------
+   * EDC copied from the ANC book (สมุดฝากครรภ์): a second way to confirm GA.
+   * It never changes the EDC the app uses; it only says whether the book agrees.
+   * ------------------------------------------------------------------ */
+
+  // Naegele's calendar rule (LMP + 7 days, minus 3 months, plus 1 year). Many books are
+  // filled in by hand this way, which can differ from LMP + 280 days by 0 to 3 days.
+  function naegeleEDC(lmpDay) {
+    var p = ymdFromDay(lmpDay + 7);
+    var m = p.m - 3, y = p.y + 1;
+    if (m < 1) { m += 12; y -= 1; }
+    var last = ymdFromDay(dayFromYMD(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1, 1) - 1).d;
+    return dayFromYMD(y, m, Math.min(p.d, last));
+  }
+
+  // bookEdc: day number; a: assessDating result; finalEdc: EDC in use (after any override)
+  function checkBookEDC(bookEdc, a, finalEdc, lmpDay) {
+    var r = { diffFinal: null, sameAsFinal: false, sameAsLmp: false, sameAsUs: false, sameAsNaegele: false };
+    if (bookEdc == null) return r;
+    if (finalEdc != null) { r.diffFinal = bookEdc - finalEdc; r.sameAsFinal = r.diffFinal === 0; }
+    r.sameAsLmp = a.edcLmp != null && bookEdc === a.edcLmp;
+    r.sameAsUs = a.edcUs != null && bookEdc === a.edcUs;
+    r.sameAsNaegele = lmpDay != null && !r.sameAsLmp && bookEdc === naegeleEDC(lmpDay);
+    return r;
+  }
+
+  /* ------------------------------------------------------------------
    * CSV
    * ------------------------------------------------------------------ */
 
@@ -640,7 +666,7 @@
     parseGA: parseGA, gaFromWD: gaFromWD,
     edcFromLMP: edcFromLMP, edcFromUS: edcFromUS, gaOn: gaOn, bandFor: bandFor,
     assessDating: assessDating, ERROR_TEXT: ERROR_TEXT, SOURCE_TEXT: SOURCE_TEXT, T3_CAUTION: T3_CAUTION,
-    reportLine: reportLine,
+    reportLine: reportLine, naegeleEDC: naegeleEDC, checkBookEDC: checkBookEDC,
     decodeText: decodeText, parseCSV: parseCSV, toCSV: toCSV,
     processRow: processRow, outputHeaders: outputHeaders, outputCells: outputCells,
     dayToExcelSerial: dayToExcelSerial, isEmptyCell: isEmptyCell

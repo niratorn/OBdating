@@ -102,6 +102,23 @@
             </dl>
           </fieldset>
 
+          <fieldset class="block" id="blk-book">
+            <legend>EDC ในสมุดฝากครรภ์ <span class="hint">ถ้ามี ใช้ยืนยัน GA อีกทาง ไม่เปลี่ยน EDC ที่ระบบใช้</span></legend>
+            <div class="datefield">
+              <input id="book-edc" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                placeholder="วว/ดด/ปปปป" aria-describedby="book-echo" aria-label="EDC ในสมุดฝากครรภ์">
+              <label class="picker" title="เลือกจากปฏิทิน">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                <input type="date" id="book-edc-picker" aria-label="เลือก EDC ในสมุดจากปฏิทิน">
+              </label>
+            </div>
+            <p class="echo" id="book-echo"></p>
+            <dl class="mini" id="book-out" hidden>
+              <div><dt>GA ตาม EDC ในสมุด ณ วันตรวจ</dt><dd id="book-ga"></dd></div>
+              <div><dt>เทียบกับ EDC ที่ระบบใช้</dt><dd id="book-check"></dd></div>
+            </dl>
+          </fieldset>
+
           <div class="actions">
             <button type="button" class="btn" id="btn-example">ลองตัวอย่าง (มีผล US)</button>
             <button type="button" class="btn" id="btn-clear">ล้างข้อมูลคนไข้</button>

@@ -19,6 +19,7 @@
     visitErr: null,
     lmp: null, lmpErr: null,
     lmpUnknown: false,   // ticked: the woman cannot remember her LMP
+    bookEdc: null, bookEdcErr: null,   // EDC copied from the ANC book, cross-check only
     usDate: null, usDateErr: null,
     usGA: null, usGAErr: null,
     override: 'auto'
@@ -142,6 +143,9 @@
   var handleUSDate = bindDateField('us-date', 'us-date-picker', function (day, err) {
     state.usDate = day; state.usDateErr = err; recompute();
   });
+  var handleBook = bindDateField('book-edc', 'book-edc-picker', function (day, err) {
+    state.bookEdc = day; state.bookEdcErr = err; recompute();
+  });
 
   function readUSGA(final) {
     var wEl = $('us-w'), dEl = $('us-d');
@@ -193,10 +197,10 @@
   $('lmp-unknown').addEventListener('change', function () { setLmpUnknown(this.checked); recompute(); });
 
   $('btn-clear').addEventListener('click', function () {
-    ['lmp', 'us-date', 'us-w', 'us-d'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('invalid'); });
-    ['lmp-picker', 'us-date-picker'].forEach(function (id) { $(id).value = ''; });
-    state.lmp = state.usDate = state.usGA = null;
-    state.lmpErr = state.usDateErr = state.usGAErr = null;
+    ['lmp', 'us-date', 'us-w', 'us-d', 'book-edc'].forEach(function (id) { $(id).value = ''; $(id).classList.remove('invalid'); });
+    ['lmp-picker', 'us-date-picker', 'book-edc-picker'].forEach(function (id) { $(id).value = ''; });
+    state.lmp = state.usDate = state.usGA = state.bookEdc = null;
+    state.lmpErr = state.usDateErr = state.usGAErr = state.bookEdcErr = null;
     state.override = 'auto'; $('override').value = 'auto';
     $('copy-fallback').hidden = true;
     setLmpUnknown(false);
@@ -210,6 +214,7 @@
     $('lmp').value = '01/07/2563'; handleLMP(true);
     $('us-date').value = '01/09/2563'; handleUSDate(true);
     $('us-w').value = '7'; $('us-d').value = '5'; readUSGA(true);
+    $('book-edc').value = '15/04/2564'; handleBook(true);
     state.override = 'auto'; $('override').value = 'auto';
     recompute();
   });
@@ -235,6 +240,7 @@
     renderLMP(a, v);
     renderUS(a, v, usPair);
     renderSummary(a, v, final, source, manual);
+    renderBook(a, v, final, lmp);
   }
 
   function renderVisitEcho(v) {
@@ -399,6 +405,45 @@
     tr.cells[2].innerHTML = esc(C.fmtThai(edc, true)) + (chosen ? '<span class="tag">ใช้</span>' : '');
   }
 
+  /* ---------------- EDC written in the ANC book ---------------- */
+  function renderBook(a, v, final, lmp) {
+    var out = $('book-out');
+    if (state.bookEdc == null) {
+      out.hidden = true;
+      if (state.bookEdcErr && state.bookEdcErr !== 'pending') setEcho('book-echo', 'err', state.bookEdcErr + ' ลองพิมพ์แบบ 23/03/2570');
+      else setEcho('book-echo', '', '');
+      return;
+    }
+    setEcho('book-echo', 'ok', C.fmtThaiLong(state.bookEdc) + ' (เทียบเท่า LMP ' + C.fmtDMYBE(state.bookEdc - C.DAYS_LMP_TO_EDC) + ')');
+    out.hidden = false;
+    var gaEl = $('book-ga');
+    if (v == null) gaEl.innerHTML = '<span class="warn-text">ใส่วันที่ตรวจ</span>';
+    else {
+      var g = C.gaOn(state.bookEdc, v);
+      if (g < 0) gaEl.innerHTML = '<span class="warn-text">วันที่ตรวจอยู่ก่อนเริ่มตั้งครรภ์ ตรวจสอบปี พ.ศ.</span>';
+      else if (g > C.MAX_GA_DAYS) gaEl.innerHTML = '<span class="warn-text">เกิน 44 สัปดาห์ ตรวจสอบปี พ.ศ.</span>';
+      else gaEl.innerHTML = esc(C.fmtWDThai(g)) + ' <small>(' + g + ' วัน)</small>';
+    }
+    var el = $('book-check');
+    if (final == null) {
+      el.innerHTML = '<small>ยังไม่มี EDC จาก LMP หรือ U/S ให้เทียบ</small>';
+      return;
+    }
+    var chk = C.checkBookEDC(state.bookEdc, a, final, lmp);
+    if (chk.sameAsFinal) {
+      el.innerHTML = '<span class="book-ok">ตรงกัน</span>';
+      return;
+    }
+    var html = '<span class="book-warn">ต่างกัน ' + Math.abs(chk.diffFinal) + ' วัน</span> <small>(GA ตามสมุด' +
+      (chk.diffFinal > 0 ? 'น้อยกว่า' : 'มากกว่า') + ')</small>';
+    var why = '';
+    if (chk.sameAsLmp) why = 'ตรงกับ EDC ตาม LMP อาจยังไม่ได้แก้ตาม U/S';
+    else if (chk.sameAsUs) why = 'ตรงกับ EDC ตาม U/S';
+    else if (chk.sameAsNaegele) why = 'ตรงกับการนับแบบ Naegele (+7 วัน ลบ 3 เดือน) ส่วนระบบใช้ LMP + 280 วัน';
+    if (why) html += '<span class="book-note">' + esc(why) + '</span>';
+    el.innerHTML = html;
+  }
+
   /* ---------------- Report line ---------------- */
   function wdSup(days) {
     var p = C.splitWD(days);
@@ -538,6 +583,12 @@
         (a.exceeds ? 'ใช้ EDC จาก US' : 'ใช้ EDC จาก LMP') + (s.manual ? ' แพทย์เลือก ' + s.source + ' เอง' : ''));
     }
     lines.push('EDC ที่ใช้ ' + C.fmtDMYBE(s.final) + (s.ga != null ? ' GA ณ วันตรวจ ' + C.fmtWD(s.ga) + ' wk' : ''));
+    if (state.bookEdc != null) {
+      var bg = v != null ? C.gaOn(state.bookEdc, v) : null;
+      var diff = state.bookEdc - s.final;
+      lines.push('EDC ในสมุด ' + C.fmtDMYBE(state.bookEdc) + (bg != null && bg >= 0 ? ' GA ' + C.fmtWD(bg) + ' wk' : '') +
+        (diff === 0 ? ' ตรงกับ EDC ที่ใช้' : ' ต่างจาก EDC ที่ใช้ ' + Math.abs(diff) + ' วัน'));
+    }
     return lines.join('\n');
   }
   $('btn-copy').addEventListener('click', function () {

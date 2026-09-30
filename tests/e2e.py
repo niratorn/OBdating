@@ -58,6 +58,9 @@ with sync_playwright() as p:
     check("EDC 8 Mar 2570", text(page, "#res-edc") == "จ. 8 มี.ค. 2570", text(page, "#res-edc"))
     check("big GA 17+2", text(page, "#res-ga").replace("\n", "").replace(" ", "") == "17สัปดาห์2วัน", text(page, "#res-ga"))
     check("report LMP only", report(page) == "GA 17+2 Wk by date", str(report(page)))
+    fill_date(page, "#book-edc", "08/03/2570")
+    check("book EDC GA 17+2", "17 สัปดาห์ 2 วัน" in text(page, "#book-ga"), text(page, "#book-ga"))
+    check("book EDC matches", "ตรงกัน" in text(page, "#book-check"), text(page, "#book-check"))
     fill_date(page, "#us-date", "03/08/2569")     # GA by LMP on that day = 9+0
     page.fill("#us-w", "9"); page.fill("#us-d", "2"); page.locator("#us-d").blur()
     check("report by date = U/S", report(page) == "GA 17+2 Wk by date = U/S at GA 9+0 wk", str(report(page)))
@@ -72,6 +75,7 @@ with sync_playwright() as p:
     check("GA rolled to 17+3", "17 สัปดาห์ 3 วัน" in text(page, "#lmp-ga"), text(page, "#lmp-ga"))
     check("toast shown", page.locator("#toast").is_visible())
     check("report rolled, dating part unchanged", report(page) == "GA 17+3 Wk by date = U/S at GA 9+0 wk", str(report(page)))
+    check("book EDC GA rolled to 17+3", "17 สัปดาห์ 3 วัน" in text(page, "#book-ga"), text(page, "#book-ga"))
 
     # A sleeping tab: the clock jumps without timers firing, then the tab becomes visible
     page.clock.set_system_time(datetime(2026, 10, 3, 8, 0, 0, tzinfo=BKK))
@@ -121,10 +125,36 @@ with sync_playwright() as p:
     clip = page.evaluate("navigator.clipboard.readText()")
     check("copy text", "EDC ที่ใช้ 15/04/2564" in clip and "ผลต่าง 8 วัน" in clip, clip)
     check("copy starts with report", clip.split("\n")[0] == "GA 7+5 Wk by U/S ≠ date at GA 7+5 wk", clip)
+    check("copy has book EDC line", "EDC ในสมุด 15/04/2564 GA 7+5 wk ตรงกับ EDC ที่ใช้" in clip, clip)
     page.click("#btn-copy-report")
     page.wait_for_timeout(100)
     clip = page.evaluate("navigator.clipboard.readText()")
     check("copy report line", clip == "GA 7+5 Wk by U/S ≠ date at GA 7+5 wk", clip)
+
+    # ANC book EDC cross-check with the case from the user's screenshot
+    page.click("#btn-clear")
+    check("book cleared", not page.locator("#book-out").is_visible())
+    fill_date(page, "#lmp", "06/08/2569")
+    fill_date(page, "#us-date", "01/09/2569")
+    page.fill("#us-w", "11"); page.fill("#us-d", "0"); page.locator("#us-d").blur()
+    fill_date(page, "#book-edc", "13/05/2570")
+    check("book GA from old EDC", "7 สัปดาห์ 6 วัน" in text(page, "#book-ga"), text(page, "#book-ga"))
+    bc = text(page, "#book-check")
+    check("book differs 51 days, matches LMP", "ต่างกัน 51 วัน" in bc and "ตรงกับ EDC ตาม LMP" in bc, bc)
+    check("book does not change EDC in use", text(page, "#res-edc") == "อ. 23 มี.ค. 2570", text(page, "#res-edc"))
+    fill_date(page, "#book-edc", "23/03/2570")
+    check("book GA 15+1 matches", "15 สัปดาห์ 1 วัน" in text(page, "#book-ga") and "ตรงกัน" in text(page, "#book-check"),
+          text(page, "#book-ga") + " / " + text(page, "#book-check"))
+    page.click("#btn-clear")
+    fill_date(page, "#visit-date", "01/09/2563")
+    fill_date(page, "#lmp", "01/07/2563")
+    fill_date(page, "#book-edc", "08/04/2564")
+    bc = text(page, "#book-check")
+    check("book Naegele hint", "ต่างกัน 1 วัน" in bc and "Naegele" in bc, bc)
+    page.click("#btn-clear")
+    fill_date(page, "#book-edc", "23/03/2570")
+    check("book alone gives GA", "15 สัปดาห์ 1 วัน" in text(page, "#book-ga") and "ยังไม่มี EDC" in text(page, "#book-check"),
+          text(page, "#book-ga") + " / " + text(page, "#book-check"))
 
     # second trimester keep LMP: LMP 14+2 vs US 12+6
     page.click("#btn-clear")

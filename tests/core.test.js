@@ -173,6 +173,35 @@ test('report: LMP only, doctor overrides, and impossible dates', function () {
   assert.strictEqual(rl(lmp, null, null, lmp + 45 * 7), null);
 });
 
+/* ---------- EDC from the ANC book ---------- */
+test('Naegele calendar EDC', function () {
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2020, 7, 1))), '2021-04-08');
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2026, 6, 1))), '2027-03-08');
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2021, 5, 1))), '2022-02-08');
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2021, 5, 24))), '2022-02-28');   // 31 Feb clamps to month end
+  assert.strictEqual(C.fmtISO(C.naegeleEDC(D(2023, 12, 25))), '2024-10-01');  // crosses the year
+});
+test('book EDC agrees with the EDC in use, or with LMP only (not corrected), or with Naegele', function () {
+  var lmp = BE(6, 8, 2569), us = BE(1, 9, 2569);
+  var a = C.assessDating({ lmp: lmp, usDate: us, usGA: 77 });
+  assert.strictEqual(C.fmtDMYBE(a.edcLmp), '13/05/2570');
+  assert.strictEqual(C.fmtDMYBE(a.edcUs), '23/03/2570');
+  var ok = C.checkBookEDC(BE(23, 3, 2570), a, a.edcFinal, lmp);
+  assert.strictEqual(ok.sameAsFinal, true);
+  assert.strictEqual(ok.sameAsUs, true);
+  var old = C.checkBookEDC(BE(13, 5, 2570), a, a.edcFinal, lmp);
+  assert.strictEqual(old.diffFinal, 51);
+  assert.strictEqual(old.sameAsLmp, true);
+  assert.strictEqual(C.fmtWD(C.gaOn(BE(13, 5, 2570), BE(30, 9, 2569))), '7+6');
+  assert.strictEqual(C.fmtWD(C.gaOn(BE(23, 3, 2570), BE(30, 9, 2569))), '15+1');
+  var l2 = BE(1, 7, 2563), a2 = C.assessDating({ lmp: l2 });
+  var nae = C.checkBookEDC(BE(8, 4, 2564), a2, a2.edcFinal, l2);
+  assert.strictEqual(nae.diffFinal, 1);
+  assert.strictEqual(nae.sameAsNaegele, true);
+  var none = C.checkBookEDC(BE(8, 4, 2564), C.assessDating({}), null, null);
+  assert.strictEqual(none.diffFinal, null);
+});
+
 /* ---------- Date parsing ---------- */
 test('Thai numeric dates, day first, B.E. and C.E. years', function () {
   assert.strictEqual(pd('1/9/2563'), '2020-09-01');

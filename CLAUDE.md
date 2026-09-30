@@ -39,6 +39,11 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - The handout writes "at 19+1 wk" in one example and "at GA 9+3 wk" in another; the app always writes "at GA". The handout printed case 2's EDC by U/S once as 19/9/2556; the tests use 19/9/2566, which matches the handout's own report line and the LMP + 280 arithmetic.
 - tests/core.test.js checks all five handout cases against `reportLine()`; tests/e2e.py checks the rendered line, the day rollover, override and copy.
 
+## EDC from the ANC book (block "EDC ในสมุดฝากครรภ์", requested 2026-09-30)
+- A second way for the obstetrician to confirm GA: the EDC written in the ANC book gives GA on the visit date, which moves with "today" like everything else.
+- Cross-check only. It never changes the EDC in use, the wheel, or the report line. It says "ตรงกัน" or "ต่างกัน N วัน" against the EDC in use, and explains the gap when it can: the book equals EDC by LMP (maybe not corrected after U/S), equals EDC by U/S, or equals Naegele's calendar rule (+7 days, minus 3 months, plus 1 year) while the app uses LMP + 280.
+- Code: `naegeleEDC()` and `checkBookEDC()` in src/core.js. Tests: the screenshot case (LMP 06/08/2569, U/S 01/09/2569 11+0, book 13/05/2570 vs 23/03/2570) in both test files.
+
 ## Behaviour that must not regress
 - "Today" follows the device clock. Re-checked every 30 s, on visibilitychange, focus, pageshow, and by a timer at local midnight. In "today" mode the visit date moves with it; a typed visit date stays fixed. Focusing the visit field without typing must not switch it to fixed. Covered by tests/e2e.py (clock 30 Sep 2569 23:58 rolls to 1 Oct).
 - Dates are integer day numbers, no time zones. Input accepts B.E. and C.E., Thai month names, Thai digits, 8 digits (01092563), Excel serials, and B.E. years typed into a non-Thai Excel (year 2563 stored as C.E.). Two-digit years mean B.E. unless changed in the research settings.
