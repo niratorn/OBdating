@@ -86,11 +86,11 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
 - Live check after commit ec76e0e (2026-09-30, app's browser pane): policy present, every request went to niratorn.github.io only (7 font files), SheetJS 0.18.5 runs under the policy (synthetic .xlsx read in the research tab), example report line correct, no violation until a deliberate fetch() to another site, which was blocked.
 - Parsers refuse text longer than `MAX_INPUT_CHARS` (60) so a pathological cell cannot stall the regexes.
 - Nothing secret in the repo or its history; commits are authored by Claude noreply. Live headers: HTTPS with HSTS from GitHub Pages; GitHub Pages cannot send frame-ancestors or X-Frame-Options (low impact, no account actions on the page).
-- Account notes for the owner: the Claude app's browser pane stays signed in to GitHub; the Claude GitHub connection can push to every repo; use the GitHub noreply email once Git is installed.
 
 ## Privacy
+- This file is public. Anyone can read it on github.com and at https://niratorn.github.io/OBdating/CLAUDE.md, because GitHub Pages serves every file in the repo. Older versions stay readable in the commit history. Write nothing here that should stay private.
 - No patient data in this folder, in a repo, or in a public URL. The sample data in the research tab is synthetic (A001 to A007).
-- Private links (the claude.ai artifact copy of this app) live only in the claude.ai Project doc `claude/preg-wheel-project-notes.md`, never in this public repo. That doc is this file plus a "Links kept out of the public repo" section. Update it whenever this file changes, and republish the artifact from `dist/artifact.html` after a build.
+- Private links (the claude.ai artifact copy of this app) and the owner's account notes live only in the claude.ai Project doc `claude/preg-wheel-project-notes.md`, never in this public repo. That doc is this file plus a "Kept out of the public repo" section. Update it whenever this file changes. Republish the artifact from `dist/artifact.html` after a build.
 
 ## Known limits
 - The ANC-book hint "ตรงกับการนับแบบ Naegele ... ส่วนระบบใช้ LMP + 280 วัน" (app.js renderBook) also shows when the EDC in use came from U/S, where the real gap is the U/S redate. Found in review 2026-09-30, not changed.
