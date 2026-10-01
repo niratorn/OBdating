@@ -72,7 +72,7 @@ Owner: Niratorn (OB-GYN, Phichit Hospital). Started 2026-09-30.
   1. `add_repo` niratorn/OBdating with push access, then clone it.
   2. md5-compare the clone with D:\Phichithospital\Research Preg Wheel (that folder has no .git; skip `vendor/`, `dist/`, `deploy-log.txt`). If the D: copy is newer, bring those files into the clone first.
   3. Edit in the clone, `python build.py`, run both test files, commit, push.
-  4. Copy the changed files, and `dist/artifact.html`, back to the D: folder with device_commit_files and expectedMtimeMs.
+  4. Copy the changed files, and `dist/artifact.html`, back to the D: folder with device_commit_files and expectedMtimeMs. Write each file from a staging path not used before in the session, then re-stage it and compare hashes. On 2026-10-01 a second write from the same staging path put the old content on disk although the tool reported success.
   5. Pages rebuilds in about a minute. Check https://niratorn.github.io/OBdating/?v=<commit> so a cached old copy is not what gets tested.
 - deploy.bat commits the folder as it is: its first run does `reset --mixed origin/main`, then `add -A`, commit and push. Never run it while D: is older than GitHub. It would push the old files over newer commits.
 - Once the D: folder is granted, a cloud session linked to the PC has device_list_dir, device_stage_files and device_commit_files. They may already be loaded, so a ToolSearch answer of "No matching deferred tools found" does not mean they are missing. On 2026-09-30 a session concluded that wrongly and left D: one commit behind overnight. Do step 4 in the same session as every push.
