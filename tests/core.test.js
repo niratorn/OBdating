@@ -505,5 +505,217 @@ test('batch: Excel serials and B.E. typed into non-Thai Excel', function () {
   assert.strictEqual(C.fmtDMYBE(r.dating.edcFinal), '15/04/2564');
 });
 
+/* ---------- Table mode: one pregnancy, many service dates (requested 2026-10-03) ---------- */
+// The example used on the page: EDC 14/09/2022, so day 0 is 08/12/2021.
+var T_EDC = D(2022, 9, 14);
+var T_DATES = ['8/2/2022', '18/3/2022', '4/5/2022', '23/6/2022', '12/8/2022', '6/9/2022', '20/10/2023'];
+function tg(raw, edc) { return C.gaForDate(edc === undefined ? T_EDC : edc, raw, {}); }
+function twd(raw, edc) { var r = tg(raw, edc); return r.gaDays == null ? r.status : C.fmtWD(r.gaDays); }
+
+test('table: GA on each service date from the EDC, worked by hand', function () {
+  assert.strictEqual(C.fmtISO(T_EDC - C.DAYS_LMP_TO_EDC), '2021-12-08');
+  assert.deepStrictEqual(T_DATES.map(function (d) { return twd(d); }),
+    ['8+6', '14+2', '21+0', '28+1', '35+2', '38+6', 'bad']);
+  assert.strictEqual(tg('8/2/2022').gaDays, 62);
+  assert.strictEqual(tg('20/10/2023').note, 'GA เกิน 44+6 สัปดาห์');
+});
+test('table: B.E. and C.E. dates give the same GA, and the calendar is remembered', function () {
+  var ce = tg('8/2/2022'), be = tg('08/02/2565'), th = tg('8 ก.พ. 65');
+  assert.strictEqual(ce.gaDays, 62); assert.strictEqual(ce.era, 'CE');
+  assert.strictEqual(be.gaDays, 62); assert.strictEqual(be.era, 'BE');
+  assert.strictEqual(th.gaDays, 62); assert.strictEqual(th.era, 'BE');
+  assert.strictEqual(C.fmtDMYCE(T_EDC), '14/09/2022');
+  assert.strictEqual(C.fmtDMYBE(T_EDC), '14/09/2565');
+  assert.strictEqual(C.fmtDMYEra(T_EDC, 'CE'), '14/09/2022');
+  assert.strictEqual(C.fmtDMYEra(T_EDC, 'BE'), '14/09/2565');
+  assert.strictEqual(C.fmtDMYEra(T_EDC, null), '14/09/2565');
+});
+test('table: edges of what gets a GA', function () {
+  var day0 = T_EDC - 280;
+  assert.strictEqual(twd(C.fmtDMYCE(day0)), '0+0');                      // day 0 itself
+  assert.strictEqual(tg(C.fmtDMYCE(day0 - 1)).status, 'bad');            // the day before
+  assert.strictEqual(tg(C.fmtDMYCE(day0 - 1)).note, 'วันที่อยู่ก่อนเริ่มตั้งครรภ์');
+  assert.strictEqual(twd(C.fmtDMYCE(T_EDC)), '40+0');                    // the EDC itself
+  assert.strictEqual(tg(C.fmtDMYCE(day0 + 44 * 7)).status, 'ok');        // 44+0: no note yet
+  var late = tg(C.fmtDMYCE(day0 + 44 * 7 + 1));
+  assert.strictEqual(late.status, 'warn');
+  assert.strictEqual(late.gaDays, 309);
+  assert.strictEqual(late.note, 'GA เกิน 44 สัปดาห์ ตรวจสอบวันที่');
+  assert.strictEqual(twd(C.fmtDMYCE(day0 + C.MAX_GA_DAYS)), '44+6');     // last day that gets a GA
+  var beyond = tg(C.fmtDMYCE(day0 + C.MAX_GA_DAYS + 1));
+  assert.strictEqual(beyond.status, 'bad');
+  assert.strictEqual(beyond.gaDays, null);
+  assert.strictEqual(beyond.unread, undefined);                          // readable, only out of range
+});
+test('table: empty, unreadable and not-yet-anchored rows give no GA', function () {
+  assert.strictEqual(tg('').status, 'empty');
+  assert.strictEqual(tg('   ').status, 'empty');
+  assert.strictEqual(tg(null).status, 'empty');
+  var bad = tg('วันที่รับบริการ');          // a header cell copied by mistake
+  assert.strictEqual(bad.status, 'bad'); assert.strictEqual(bad.unread, true); assert.strictEqual(bad.gaDays, null);
+  assert.strictEqual(tg('31/2/2022').note, 'ไม่มีวันที่นี้ในปฏิทิน');
+  var wait = tg('8/2/2022', null);
+  assert.strictEqual(wait.status, 'wait'); assert.strictEqual(wait.gaDays, null);
+  assert.strictEqual(C.fmtISO(wait.day), '2022-02-08');
+});
+test('table: reference given as GA on a date', function () {
+  assert.strictEqual(C.edcFromGAOn(D(2022, 3, 2), 12 * 7), T_EDC);        // GA 12+0 on 2/3/2022
+  assert.strictEqual(C.edcFromGAOn(D(2021, 12, 8), 0), T_EDC);            // 0+0: the date is the LMP
+  assert.strictEqual(C.edcFromGAOn(D(2021, 12, 8), 0), C.edcFromLMP(D(2021, 12, 8)));
+  assert.strictEqual(C.edcFromGAOn(T_EDC, 280), T_EDC);                   // 40+0 on the EDC
+  for (var ga = 0; ga <= C.MAX_GA_DAYS; ga += 11) {                       // GA on the reference date reads back
+    var when = D(2024, 2, 20), edc = C.edcFromGAOn(when, ga);
+    assert.strictEqual(C.gaForDate(edc, C.fmtDMYCE(when), {}).gaDays, ga);
+  }
+});
+test('table: the two GA boxes of the reference', function () {
+  function pa(w, d) { var r = C.parseAnchorGA(w, d); return r.ok ? r.days : (r.empty ? 'EMPTY' : 'ERR:' + r.field); }
+  assert.strictEqual(pa('12', '0'), 84);
+  assert.strictEqual(pa('12', ''), 84);
+  assert.strictEqual(pa(' 12 ', ' 3 '), 87);
+  assert.strictEqual(pa('๑๒', '๓'), 87);
+  assert.strictEqual(pa('0', '0'), 0);                                    // allowed here, unlike a U/S GA
+  assert.strictEqual(pa('0', ''), 0);
+  assert.strictEqual(pa('44', '6'), 314);
+  assert.strictEqual(pa('', ''), 'EMPTY');
+  assert.strictEqual(pa(null, undefined), 'EMPTY');
+  assert.strictEqual(pa('45', '0'), 'ERR:w');
+  assert.strictEqual(pa('44', '7'), 'ERR:d');
+  assert.strictEqual(pa('12', '7'), 'ERR:d');
+  assert.strictEqual(pa('12', 'x'), 'ERR:d');
+  assert.strictEqual(pa('', '3'), 'ERR:w');
+  assert.strictEqual(pa('abc', ''), 'ERR:w');
+  assert.strictEqual(pa('12+', ''), 'ERR:w');
+  assert.strictEqual(C.parseAnchorGA('12+', '').soft, true);              // still being typed
+  assert.strictEqual(C.parseAnchorGA('45', '0').soft, undefined);         // a real error, shown at once
+  var s = C.parseAnchorGA('12+3', '');
+  assert.strictEqual(s.days, 87); assert.strictEqual(s.split, true); assert.strictEqual(s.w, 12); assert.strictEqual(s.d, 3);
+  var s2 = C.parseAnchorGA('12w3d', '5');                                 // text in the weeks box wins
+  assert.strictEqual(s2.days, 87); assert.strictEqual(s2.split, true);
+  assert.strictEqual(C.parseAnchorGA('12', '3').split, false);
+  assert.strictEqual(pa(new Array(80).join('1'), ''), 'ERR:w');
+});
+test('table: clipboard text keeps one line per row and blanks what has no GA', function () {
+  var res = T_DATES.map(function (d) { return tg(d); });
+  var out = C.tableClipboardText(res, {});
+  assert.strictEqual(out.text, '8\t6\r\n14\t2\r\n21\t0\r\n28\t1\r\n35\t2\r\n38\t6\r\n\t');
+  assert.strictEqual(out.rows, 7); assert.strictEqual(out.filled, 6); assert.strictEqual(out.blank, 1);
+  var withEdc = C.tableClipboardText(res, { edcText: '14/09/2022' });
+  assert.strictEqual(withEdc.text.split('\r\n')[0], '14/09/2022\t8\t6');
+  assert.strictEqual(withEdc.text.split('\r\n')[6], '\t\t');              // no GA, so no EDC either
+  assert.strictEqual(withEdc.text.split('\r\n').length, 7);
+});
+test('table: empty rows inside stay, empty rows after the last entry are left out', function () {
+  var res = ['8/2/2022', '', 'xx', '4/5/2022', '', ''].map(function (d) { return tg(d); });
+  var out = C.tableClipboardText(res, {});
+  assert.strictEqual(out.text, '8\t6\r\n\t\r\n\t\r\n21\t0');
+  assert.strictEqual(out.rows, 4); assert.strictEqual(out.filled, 2); assert.strictEqual(out.blank, 2);
+  var none = C.tableClipboardText(['', ''].map(function (d) { return tg(d); }), {});
+  assert.strictEqual(none.text, ''); assert.strictEqual(none.rows, 0); assert.strictEqual(none.filled, 0);
+  var waiting = C.tableClipboardText(['8/2/2022'].map(function (d) { return tg(d, null); }), {});
+  assert.strictEqual(waiting.rows, 1); assert.strictEqual(waiting.filled, 0);
+  var line = C.tableClipboardText([tg(C.fmtDMYCE(T_EDC - 280))], {});      // GA 0+0 is a result, not a blank
+  assert.strictEqual(line.text, '0\t0'); assert.strictEqual(line.filled, 1);
+});
+test('table: which calendar the pasted dates use', function () {
+  var ce = T_DATES.map(function (d) { return tg(d); });
+  assert.strictEqual(C.majorityEra(ce), 'CE');
+  assert.strictEqual(C.majorityEra(['08/02/2565', '18/03/2565', '4/5/2022'].map(function (d) { return tg(d); })), 'BE');
+  assert.strictEqual(C.majorityEra(['08/02/2565', '4/5/2022'].map(function (d) { return tg(d); })), null);
+  assert.strictEqual(C.majorityEra(['', 'xx'].map(function (d) { return tg(d); })), null);
+  assert.strictEqual(C.majorityEra([]), null);
+  assert.strictEqual(C.majorityEra(['20/10/2023'].map(function (d) { return tg(d); })), 'CE');   // out of range still counts
+});
+test('table: text pasted from Google Sheets or Excel', function () {
+  var sheets = C.parsePastedDates('10/8/2022\n19/4/2022\n3/2/2022\n11/1/2022', {});
+  assert.deepStrictEqual(sheets.values, ['10/8/2022', '19/4/2022', '3/2/2022', '11/1/2022']);
+  assert.strictEqual(sheets.cols, 1); assert.strictEqual(sheets.col, 0); assert.strictEqual(sheets.cut, false);
+  assert.strictEqual(sheets.dates, 4);
+  var excel = C.parsePastedDates('10/8/2022\r\n19/4/2022\r\n', {});         // Excel ends with a line break
+  assert.deepStrictEqual(excel.values, ['10/8/2022', '19/4/2022']);
+  var gaps = C.parsePastedDates('\n10/8/2022\n\n19/4/2022\n\n\n', {});      // rows must keep their place
+  assert.deepStrictEqual(gaps.values, ['', '10/8/2022', '', '19/4/2022']);
+  assert.strictEqual(gaps.dates, 2);
+  var one = C.parsePastedDates(' 10/8/2022 ', {});
+  assert.deepStrictEqual(one.values, ['10/8/2022']);
+  assert.deepStrictEqual(C.parsePastedDates('', {}).values, []);
+  assert.deepStrictEqual(C.parsePastedDates(null, {}).values, []);
+  assert.deepStrictEqual(C.parsePastedDates('1 ก.ย., 2565\n2 ก.ย. 2565', {}).values, ['1 ก.ย., 2565', '2 ก.ย. 2565']);  // a comma is not a column
+});
+test('table: several pasted columns, the one with the dates is used', function () {
+  var p = C.parsePastedDates('A1\t10/8/2022\t31\nA1\t19/4/2022\t16\nA1\t3/2/2022\t5', {});
+  assert.strictEqual(p.cols, 3); assert.strictEqual(p.col, 1);
+  assert.deepStrictEqual(p.values, ['10/8/2022', '19/4/2022', '3/2/2022']);
+  var tie = C.parsePastedDates('1/1/2022\t2/2/2022\n3/3/2022\t4/4/2022', {});  // two date columns: the left one
+  assert.strictEqual(tie.col, 0);
+  assert.deepStrictEqual(tie.values, ['1/1/2022', '3/3/2022']);
+  var nodate = C.parsePastedDates('a\tb\nc\td', {});
+  assert.strictEqual(nodate.col, 0);
+  assert.deepStrictEqual(nodate.values, ['a', 'c']);
+  assert.strictEqual(nodate.dates, 0);                                     // lets the page refuse a paste with no date in it
+  var quoted = C.parsePastedDates('10/8/2022\t"line one\nline two"\n19/4/2022\tplain', {});   // a cell with a line break
+  assert.strictEqual(quoted.cols, 2);
+  assert.deepStrictEqual(quoted.values, ['10/8/2022', '19/4/2022']);
+  assert.strictEqual(quoted.multiline, true);                              // the page asks to check the row count
+  assert.strictEqual(p.multiline, false);
+  var noteDate = C.parsePastedDates('10/8/2022\t"see again\n12/3/2022"\n19/4/2022\tplain', {});  // second line of a note is a date
+  assert.deepStrictEqual(noteDate.values, ['10/8/2022', '19/4/2022']);     // still two rows, not three
+  var ragged = C.parsePastedDates('x\t10/8/2022\ny\n\t19/4/2022', {});      // short rows
+  assert.deepStrictEqual(ragged.values, ['10/8/2022', '', '19/4/2022']);
+});
+test('table: a stray quote mark in another column must not shift the rows', function () {
+  // The second cell of row 1 begins with a quote mark but is not a quoted cell. Read as CSV
+  // it would swallow rows 1 to 3 into one. The rows must stay three.
+  var stray = C.parsePastedDates('A\t"abc\t10/8/2022\nB\tdef\t19/4/2022\nC\t"x\t3/2/2022', {});
+  assert.deepStrictEqual(stray.values, ['10/8/2022', '19/4/2022', '3/2/2022']);
+  assert.strictEqual(stray.col, 2);
+  assert.strictEqual(stray.multiline, true);
+  var open = C.parsePastedDates('10/8/2022\t"never closed\n19/4/2022\tb\n3/2/2022\tc\n', {});   // a quote that never closes
+  assert.deepStrictEqual(open.values, ['10/8/2022', '19/4/2022', '3/2/2022']);
+  var inside = C.parsePastedDates('10/8/2022\t5 ft 2"\n19/4/2022\tsay "hi"', {});                   // quotes inside a cell are harmless
+  assert.deepStrictEqual(inside.values, ['10/8/2022', '19/4/2022']);
+  assert.strictEqual(inside.multiline, false);
+  var doubled = C.parsePastedDates('10/8/2022\t"say ""hi"""\n19/4/2022\tb', {});                    // a properly quoted cell
+  assert.deepStrictEqual(doubled.values, ['10/8/2022', '19/4/2022']);
+  assert.strictEqual(doubled.multiline, false);
+});
+test('table: a very long paste is cut at MAX_TABLE_ROWS and says so', function () {
+  var many = [];
+  for (var i = 0; i < C.MAX_TABLE_ROWS + 25; i++) many.push('8/2/2022');
+  var p = C.parsePastedDates(many.join('\n'), {});
+  assert.strictEqual(p.values.length, C.MAX_TABLE_ROWS);
+  assert.strictEqual(p.total, C.MAX_TABLE_ROWS + 25);
+  assert.strictEqual(p.cut, true);
+  var t0 = Date.now();
+  C.parsePastedDates(new Array(200001).join('8/2/2022\tx\ty\n'), {});
+  assert.ok(Date.now() - t0 < 3000, 'took ' + (Date.now() - t0) + ' ms');
+});
+test('table: paste, calculate, copy back, as one round trip', function () {
+  var p = C.parsePastedDates(T_DATES.join('\n') + '\n', {});
+  var res = p.values.map(function (v) { return tg(v); });
+  var out = C.tableClipboardText(res, { edcText: C.fmtDMYEra(T_EDC, C.majorityEra(res)) });
+  var back = C.parseCSV(out.text, '\t');
+  assert.strictEqual(back.length, T_DATES.length);                         // same number of rows going back
+  assert.deepStrictEqual(back[0], ['14/09/2022', '8', '6']);
+  assert.deepStrictEqual(back[5], ['14/09/2022', '38', '6']);
+  assert.deepStrictEqual(back[6], ['', '', '']);
+});
+test('table: 1544 fixture cases match Python datetime through the table path', function () {
+  var cases = require('./fixtures/dates.json');
+  var bad = 0, counted = 0;
+  cases.forEach(function (c) {
+    var edc = C.parseDateText(c.edcLmp).day;
+    var r = C.gaForDate(edc, c.visit, {});
+    var inRange = c.gaDays >= 0 && c.gaDays <= C.MAX_GA_DAYS;
+    if (inRange ? r.gaDays !== c.gaDays : r.gaDays !== null) bad++;
+    if (inRange) counted++;
+    // the same pregnancy described as "GA on a date" must give the same EDC as the fixture
+    if (C.fmtDMYBE(C.edcFromGAOn(C.parseDateText(c.usDate).day, c.usGA)) !== c.edcUs) bad++;
+    if (bad && bad < 5) console.log('  mismatch', JSON.stringify(c), JSON.stringify(r));
+  });
+  assert.strictEqual(bad, 0);
+  assert.ok(counted > 1000, 'in range: ' + counted);
+});
+
 console.log(passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

@@ -22,7 +22,7 @@
 
   <nav class="tabs" role="tablist" aria-label="โหมดการใช้งาน">
     <button class="tab" role="tab" id="tab-clinic" aria-controls="panel-clinic" aria-selected="true">รายคน</button>
-    <button class="tab" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false">งานวิจัย (ไฟล์ Excel/CSV)</button>
+    <button class="tab" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false">งานวิจัย (ตาราง หรือไฟล์)</button>
   </nav>
 
   <main>
@@ -181,10 +181,106 @@
     </section>
 
     <section id="panel-research" role="tabpanel" aria-labelledby="tab-research" hidden>
-      <p class="research-lead">
-        ใช้กับไฟล์ที่มีหลายราย ระบบใช้กฎเดียวกับหน้ารายคน แล้วเพิ่มคอลัมน์ผลลัพธ์ต่อท้ายคอลัมน์เดิม
+      <div class="mode-bar">
+        <div class="seg" role="group" aria-label="วิธีใส่ข้อมูล">
+          <button type="button" class="seg-btn" id="mode-table" aria-pressed="true">ตาราง</button>
+          <button type="button" class="seg-btn" id="mode-file" aria-pressed="false">ไฟล์ Excel/CSV</button>
+        </div>
         <span class="privacy"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>คำนวณในเบราว์เซอร์นี้ ข้อมูลไม่ถูกส่งออกจากเครื่อง</span>
-      </p>
+      </div>
+
+      <div id="research-table">
+      <p class="research-lead">ทำทีละคน ใส่ EDC ที่ถูกต้องของผู้ป่วย แล้ววางวันที่รับบริการจาก Google Sheet ระบบคำนวณ GA เป็นสัปดาห์และวัน ให้คัดลอกกลับไปวางในชีต โหมดนี้ไม่เทียบ LMP กับ US ระบบคำนวณจาก EDC ที่ใส่เท่านั้น</p>
+      <ol class="steps">
+        <li class="step">
+          <h3 id="tm-anchor-title">ค่าอ้างอิงของผู้ป่วยรายนี้</h3>
+          <div class="anchor" role="radiogroup" aria-labelledby="tm-anchor-title">
+            <div class="anchor-opt">
+              <label class="pick"><input type="radio" name="tm-anchor" id="tm-by-edc" value="edc" checked><span>EDC ที่ถูกต้อง</span></label>
+              <div class="datefield">
+                <input id="tm-edc" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-label="EDC ที่ถูกต้อง" aria-describedby="tm-anchor-echo">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="tm-edc-picker" aria-label="เลือก EDC จากปฏิทิน">
+                </label>
+              </div>
+            </div>
+            <div class="anchor-opt">
+              <label class="pick"><input type="radio" name="tm-anchor" id="tm-by-ga" value="ga"><span>หรือ GA</span></label>
+              <div class="wd" role="group" aria-label="GA ณ วันที่ที่ทราบ">
+                <input id="tm-ga-w" type="text" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="สัปดาห์" aria-describedby="tm-anchor-echo">
+                <span>สัปดาห์</span>
+                <input id="tm-ga-d" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="0" aria-label="วัน" aria-describedby="tm-anchor-echo">
+                <span>วัน ณ วันที่</span>
+              </div>
+              <div class="datefield">
+                <input id="tm-ga-date" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-label="วันที่ที่ทราบ GA" aria-describedby="tm-anchor-echo">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="tm-ga-date-picker" aria-label="เลือกวันที่ที่ทราบ GA จากปฏิทิน">
+                </label>
+              </div>
+            </div>
+          </div>
+          <p class="echo" id="tm-anchor-echo" aria-live="polite"></p>
+        </li>
+        <li class="step">
+          <h3>วันที่รับบริการ</h3>
+          <div class="grid-head">
+            <p class="step-hint">พิมพ์ทีละช่อง หรือคัดลอกคอลัมน์วันที่จาก Google Sheet แล้วคลิกช่องแรกและกด Ctrl+V แถวจะเรียงตรงกับในชีต</p>
+            <button type="button" class="btn small" id="tm-example">ลองตัวอย่าง (สมมติ)</button>
+          </div>
+          <div class="tgrid-wrap">
+            <table class="tgrid" id="tm-grid">
+              <thead>
+                <tr>
+                  <th scope="col" class="rn">#</th>
+                  <th scope="col">วันที่รับบริการ</th>
+                  <th scope="col" class="rd">อ่านเป็น</th>
+                  <th scope="col" class="out">ga_week</th>
+                  <th scope="col" class="out">ga_days</th>
+                  <th scope="col">หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody id="tm-body"></tbody>
+            </table>
+          </div>
+          <p class="paste-status" id="tm-paste-status" role="status"></p>
+          <p class="legend"><span class="sw out"></span>ช่องที่ระบบคำนวณให้ แถวที่คำนวณไม่ได้จะเว้นว่าง เพื่อให้วางกลับแล้วแถวไม่เลื่อน</p>
+        </li>
+        <li class="step">
+          <h3>คัดลอกไปวางใน Google Sheet</h3>
+          <p class="tm-summary" id="tm-summary"></p>
+          <p class="stale" id="tm-stale" role="status" hidden>วันที่ชุดนี้เพิ่งวางใหม่ แต่ค่าอ้างอิงในขั้นที่ 1 ยังเป็นค่าเดิมที่คัดลอกผลไปแล้ว ถ้าเป็นผู้ป่วยรายใหม่ ให้แก้ค่าอ้างอิงก่อนคัดลอก</p>
+          <div class="row">
+            <button type="button" class="btn primary" id="tm-copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>
+              คัดลอก ga_week และ ga_days
+            </button>
+            <button type="button" class="btn" id="tm-copy-edc">คัดลอกพร้อม EDC</button>
+            <button type="button" class="btn" id="tm-clear">ล้าง เริ่มคนถัดไป</button>
+          </div>
+          <p class="dl-status" id="tm-copy-status" role="status"></p>
+          <textarea id="tm-copy-fallback" readonly hidden aria-label="ผลลัพธ์สำหรับคัดลอก"></textarea>
+          <details class="colguide plain">
+            <summary>วิธีคำนวณ และแถวที่เว้นว่าง</summary>
+            <dl>
+              <dt>ga_week, ga_days</dt><dd>GA ณ วันที่รับบริการ นับจาก EDC ที่ใช้ จำนวนวันของ GA คือ 280 ลบด้วยจำนวนวันจากวันที่รับบริการถึง EDC แล้วแยกเป็นสัปดาห์เต็ม กับวันที่เหลือ 0 ถึง 6</dd>
+              <dt>GA ณ วันที่</dt><dd>ถ้าใส่ค่าอ้างอิงเป็น GA ณ วันที่ ระบบหา EDC จากวันที่นั้น + 280 วัน ลบ GA ส่วน GA 0 สัปดาห์ 0 วัน แปลว่าวันนั้นคือ LMP</dd>
+              <dt>แถวที่เว้นว่าง</dt><dd>อ่านวันที่ไม่ได้ วันที่อยู่ก่อนเริ่มตั้งครรภ์ หรือ GA เกิน 44+6 สัปดาห์ ส่วน GA ที่เกิน 44 สัปดาห์แต่ไม่เกิน 44+6 ยังแสดงค่า พร้อมหมายเหตุให้ตรวจวันที่</dd>
+              <dt>การอ่านวันที่</dt><dd>วันมาก่อนเดือนเสมอ ปี 4 หลักตั้งแต่ 2400 อ่านเป็น พ.ศ. ต่ำกว่านั้นอ่านเป็น ค.ศ. ส่วนปี 2 หลักอ่านเป็น พ.ศ. คอลัมน์ อ่านเป็น แสดงวันที่ที่ระบบเข้าใจ</dd>
+              <dt>คัดลอกพร้อม EDC</dt><dd>ได้ 3 คอลัมน์ เรียง EDC, ga_week, ga_days ให้วางที่ช่อง EDC ของแถวแรก EDC เขียนแบบ วว/ดด/ปปปป ใช้ปีแบบเดียวกับวันที่ที่วางมา ชีตจึงต้องอ่านวันที่แบบวันก่อนเดือน</dd>
+              <dt>การวาง</dt><dd>วางหลายช่องพร้อมกัน จะแทนที่ตารางตั้งแต่แถวที่คลิกลงไป ถ้าคัดลอกมาหลายคอลัมน์ ระบบใช้คอลัมน์ที่อ่านเป็นวันที่ได้มากที่สุด</dd>
+            </dl>
+          </details>
+        </li>
+      </ol>
+      </div>
+
+      <div id="research-file" hidden>
+      <p class="research-lead">ใช้กับไฟล์ที่มีหลายราย ระบบใช้กฎเดียวกับหน้ารายคน แล้วเพิ่มคอลัมน์ผลลัพธ์ต่อท้ายคอลัมน์เดิม</p>
       <ol class="steps">
         <li class="step">
           <h3>เลือกไฟล์</h3>
@@ -269,6 +365,7 @@
           </details>
         </li>
       </ol>
+      </div>
     </section>
   </main>
 

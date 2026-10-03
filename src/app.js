@@ -620,8 +620,21 @@
     $('panel-clinic').hidden = !clinic;
     $('panel-research').hidden = clinic;
     try { localStorage.setItem('pregwheel-tab', clinic ? 'clinic' : 'research'); } catch (e) { /* storage unavailable */ }
-    if (!clinic) Research.ensure();
+    if (!clinic) selectResearchMode($('mode-file').getAttribute('aria-pressed') === 'true' ? 'file' : 'table');
   }
+
+  // The research tab has two ways to give the data. The table (one woman at a time, typed
+  // or pasted) opens first; the Excel/CSV file mode stays one click away.
+  function selectResearchMode(mode) {
+    var table = mode !== 'file';
+    $('mode-table').setAttribute('aria-pressed', String(table));
+    $('mode-file').setAttribute('aria-pressed', String(!table));
+    $('research-table').hidden = !table;
+    $('research-file').hidden = table;
+    if (table) TableMode.ensure(); else Research.ensure();
+  }
+  $('mode-table').addEventListener('click', function () { selectResearchMode('table'); });
+  $('mode-file').addEventListener('click', function () { selectResearchMode('file'); });
   $('tab-clinic').addEventListener('click', function () { selectTab('clinic'); });
   $('tab-research').addEventListener('click', function () { selectTab('research'); });
   document.querySelector('.tabs').addEventListener('keydown', function (e) {
@@ -1150,6 +1163,386 @@
   })();
 
   /* ================================================================
+   * Copying to the clipboard
+   * The async clipboard API comes first. Where the page may not use it (an embedded
+   * viewer, an older browser), the text is copied through a selected text box. If that
+   * fails too, the box stays open and selected, so Ctrl+C finishes the job.
+   * ================================================================ */
+  function copyText(text, box, done, manual) {
+    function legacy() {
+      box.hidden = false;
+      box.value = text;
+      box.focus();
+      box.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) { box.hidden = true; done(); } else manual();
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { box.hidden = true; done(); }, legacy);
+      } else legacy();
+    } catch (e) { legacy(); }
+  }
+
+  /* ================================================================
+   * Research tab, table mode: one woman at a time.
+   * The EDC that is already settled is typed once, or given as GA w+d on a date. The
+   * service dates are typed or pasted from Google Sheets, and GA in weeks and days comes
+   * back in the same row order, ready to paste into the sheet. Nothing is stored or sent.
+   * ================================================================ */
+  var TableMode = (function () {
+    var MIN_ROWS = 6;
+    // Made-up numbers for the "try an example" button. Not from any patient.
+    var EXAMPLE = {
+      edc: '14/09/2022',
+      dates: ['8/2/2022', '18/3/2022', '4/5/2022', '23/6/2022', '12/8/2022', '6/9/2022', '20/10/2023']
+    };
+    var T = {
+      anchor: 'edc',                 // the reference in use: 'edc', or 'ga' (GA on a date)
+      edcDay: null, edcErr: null,
+      gaDate: null, gaDateErr: null,
+      ga: null, gaErr: null,         // GA of the reference, in days
+      rows: [],                      // text of each service-date box, in table order
+      res: [],                       // C.gaForDate() result for each row
+      copied: false,                 // results were copied and the reference has not changed since
+      stale: false                   // new dates were pasted over copied ones while the reference stayed the same
+    };
+    var ready = false;
+    var body = $('tm-body');
+
+    function edcInUse() {
+      if (T.anchor === 'edc') return T.edcDay;
+      return T.ga != null && T.gaDate != null ? C.edcFromGAOn(T.gaDate, T.ga) : null;
+    }
+
+    /* ---------- The reference (step 1) ---------- */
+    function shown(err) { return err && err !== 'pending' ? err : null; }
+
+    function renderAnchor() {
+      var edc = edcInUse(), err, text;
+      if (T.anchor === 'edc') {
+        err = shown(T.edcErr);
+        if (err) text = err + ' ลองพิมพ์แบบ 14/09/2565 หรือ 14/09/2022';
+        else if (edc != null) text = 'EDC ที่ใช้ ' + C.fmtThaiLong(edc) + ' (เทียบเท่า LMP ' + C.fmtThai(edc - C.DAYS_LMP_TO_EDC, true) + ')';
+        else text = 'ใส่ EDC ที่ถูกต้องของผู้ป่วยรายนี้ พิมพ์ปีเป็น พ.ศ. หรือ ค.ศ. ก็ได้';
+      } else {
+        err = shown(T.gaErr) || shown(T.gaDateErr);
+        if (err) text = err;
+        else if (edc != null) text = 'EDC ที่ใช้ ' + C.fmtThaiLong(edc) + ' คิดจาก GA ' + C.fmtWD(T.ga) + ' ณ ' + C.fmtThai(T.gaDate, true);
+        else if (T.ga != null) text = 'ใส่วันที่ที่ GA เท่ากับ ' + C.fmtWD(T.ga);
+        else if (T.gaDate != null) text = 'ใส่ GA ณ ' + C.fmtThai(T.gaDate, true);
+        else text = 'ใส่ GA และวันที่ที่ทราบ GA นั้น';
+      }
+      setEcho('tm-anchor-echo', err ? 'err' : (edc != null ? 'ok' : ''), text);
+    }
+
+    function use(mode) {
+      T.anchor = mode;
+      $('tm-by-edc').checked = mode === 'edc';
+      $('tm-by-ga').checked = mode === 'ga';
+    }
+
+    // The likeliest slip in a one-woman-at-a-time loop: the next woman's dates are pasted
+    // and the EDC of the woman before is still there. The results would look plausible.
+    // A warning beside the copy buttons stays until the reference is changed or cleared.
+    function setStale(on) {
+      T.stale = on;
+      $('tm-stale').hidden = !on;
+    }
+
+    // Any change of the reference: the old copy no longer matches what is on screen.
+    function anchorChanged() {
+      T.copied = false;
+      setStale(false);
+      renderAnchor();
+      paintAll();
+    }
+
+    var handleEdc = bindDateField('tm-edc', 'tm-edc-picker', function (day, err, empty) {
+      T.edcDay = day; T.edcErr = err;
+      if (!empty) use('edc');
+      anchorChanged();
+    });
+    bindDateField('tm-ga-date', 'tm-ga-date-picker', function (day, err, empty) {
+      T.gaDate = day; T.gaDateErr = err;
+      if (!empty) use('ga');
+      anchorChanged();
+    });
+
+    function readGA(final) {
+      var wEl = $('tm-ga-w'), dEl = $('tm-ga-d');
+      wEl.classList.remove('invalid'); dEl.classList.remove('invalid');
+      var r = C.parseAnchorGA(wEl.value, dEl.value);
+      if (r.ok) {
+        // "12+3" typed into the weeks box: split it into the two boxes
+        if (r.split) { wEl.value = String(r.w); dEl.value = String(r.d); }
+        T.ga = r.days; T.gaErr = null;
+      } else if (r.empty) {
+        T.ga = null; T.gaErr = null;
+      } else {
+        T.ga = null;
+        T.gaErr = r.soft && !final ? 'pending' : r.error;
+        if (T.gaErr !== 'pending') (r.field === 'd' ? dEl : wEl).classList.add('invalid');
+      }
+    }
+    ['tm-ga-w', 'tm-ga-d'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        readGA(false);
+        if ($('tm-ga-w').value.trim() || $('tm-ga-d').value.trim()) use('ga');
+        anchorChanged();
+      });
+      $(id).addEventListener('change', function () { readGA(true); anchorChanged(); });
+    });
+    $('tm-by-edc').addEventListener('change', function () { if (this.checked) { use('edc'); anchorChanged(); } });
+    $('tm-by-ga').addEventListener('change', function () { if (this.checked) { use('ga'); anchorChanged(); } });
+
+    /* ---------- The grid (step 2) ---------- */
+    function lastFilled() {
+      for (var i = T.rows.length - 1; i >= 0; i--) if (T.rows[i].trim() !== '') return i;
+      return -1;
+    }
+
+    // One free row after the last entry, never fewer than MIN_ROWS, never more than the cap.
+    function fitRows() {
+      var want = Math.min(C.MAX_TABLE_ROWS, Math.max(MIN_ROWS, lastFilled() + 2));
+      while (T.rows.length < want) T.rows.push('');
+      T.rows.length = want;
+    }
+
+    function makeRow(i) {
+      var tr = document.createElement('tr');
+      function td(cls) { var c = document.createElement('td'); c.className = cls; tr.appendChild(c); return c; }
+      td('rn').textContent = String(i + 1);
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'tdate';
+      inp.spellcheck = false;
+      inp.setAttribute('inputmode', 'decimal');
+      inp.setAttribute('autocomplete', 'off');
+      inp.setAttribute('aria-label', 'วันที่รับบริการ แถว ' + (i + 1));
+      if (i === 0) inp.placeholder = 'วว/ดด/ปปปป';
+      inp.value = T.rows[i];
+      td('in').appendChild(inp);
+      td('rd'); td('out'); td('out'); td('note');
+      return tr;
+    }
+
+    // typing: the box is being typed in, so a date that cannot be read yet is not an error
+    function paintRow(i, typing) {
+      var r = T.res[i] = C.gaForDate(edcInUse(), T.rows[i], {});
+      var tr = body.rows[i];
+      if (!tr) return;
+      var quiet = !!(typing && r.unread);
+      tr.className = 'st-' + (quiet ? 'wait' : r.status);
+      tr.cells[2].textContent = r.day != null ? C.fmtThai(r.day, true) : '';
+      var wd = r.gaDays != null ? C.splitWD(r.gaDays) : null;
+      tr.cells[3].textContent = wd ? String(wd.w) : '';
+      tr.cells[4].textContent = wd ? String(wd.d) : '';
+      tr.cells[5].textContent = quiet ? '' : r.note;
+    }
+
+    function paintAll() {
+      T.res = [];
+      for (var i = 0; i < T.rows.length; i++) paintRow(i, false);
+      renderSummary();
+    }
+
+    function rebuild() {
+      fitRows();
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < T.rows.length; i++) frag.appendChild(makeRow(i));
+      body.textContent = '';
+      body.appendChild(frag);
+      paintAll();
+    }
+
+    // Typing in the last row adds the next one, so a free row is always there.
+    function grow() {
+      var want = Math.min(C.MAX_TABLE_ROWS, lastFilled() + 2);
+      while (T.rows.length < want) {
+        T.rows.push('');
+        body.appendChild(makeRow(T.rows.length - 1));
+        paintRow(T.rows.length - 1, false);
+      }
+    }
+
+    function rowOf(el) {
+      if (!el || !el.classList || !el.classList.contains('tdate')) return -1;
+      return el.parentNode.parentNode.sectionRowIndex;
+    }
+
+    function focusRow(i) {
+      if (i < 0 || i >= T.rows.length) return;
+      var inp = body.rows[i].cells[1].firstChild;
+      inp.focus();
+      inp.select();
+    }
+
+    function setPasteStatus(kind, text) {
+      var el = $('tm-paste-status');
+      el.className = 'paste-status' + (kind ? ' ' + kind : '');
+      el.textContent = text;
+    }
+
+    // The EDC written back to the sheet uses the calendar of the pasted dates. With no
+    // readable date to go by, it follows the reference date as typed, then B.E.
+    function copyEra() {
+      var era = C.majorityEra(T.res);
+      if (!era) {
+        var p = C.parseDateText($(T.anchor === 'edc' ? 'tm-edc' : 'tm-ga-date').value, {});
+        era = p.ok ? p.era : null;
+      }
+      return era || 'BE';
+    }
+
+    function counts(out) {
+      return out.rows + ' แถว คำนวณได้ ' + out.filled + (out.blank ? ' เว้นว่าง ' + out.blank : '');
+    }
+
+    function renderSummary() {
+      var out = C.tableClipboardText(T.res, {}), edc = edcInUse(), text;
+      if (!out.rows) text = 'ยังไม่มีวันที่รับบริการ';
+      else if (edc == null) text = out.rows + ' แถว ยังไม่มีค่าอ้างอิง';
+      else text = counts(out) + ' · ใช้ EDC ' + C.fmtDMYEra(edc, copyEra());
+      $('tm-summary').textContent = text;
+    }
+
+    body.addEventListener('input', function (e) {
+      var i = rowOf(e.target);
+      if (i < 0) return;
+      T.rows[i] = e.target.value;
+      grow();
+      paintRow(i, true);
+      renderSummary();
+      setPasteStatus('', '');
+    });
+    body.addEventListener('focusout', function (e) {
+      var i = rowOf(e.target);
+      if (i >= 0) paintRow(i, false);
+    });
+    body.addEventListener('keydown', function (e) {
+      var i = rowOf(e.target);
+      if (i < 0 || e.isComposing) return;
+      if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); focusRow(i + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusRow(i - 1); }
+    });
+
+    // Several cells pasted at once replace the table from the clicked row downward. Rows
+    // left over from the woman before would otherwise be calculated with the new EDC.
+    function placeRows(at, p) {
+      var replaced = T.rows.slice(at).filter(function (v) { return v.trim() !== ''; }).length;
+      var vals = p.values.slice(0, Math.max(0, C.MAX_TABLE_ROWS - at));
+      T.rows = T.rows.slice(0, at).concat(vals);
+      rebuild();
+      var msg = 'วาง ' + vals.length + ' แถว' + (at > 0 ? ' ตั้งแต่แถว ' + (at + 1) : '');
+      if (p.cols > 1) msg += ' ใช้คอลัมน์ที่ ' + (p.col + 1) + ' จาก ' + p.cols + ' คอลัมน์เป็นวันที่รับบริการ';
+      if (replaced) msg += ' แทนที่ของเดิม ' + replaced + ' แถว';
+      var cut = p.cut || vals.length < p.values.length;
+      if (cut) msg += ' ตารางรับได้ ' + C.MAX_TABLE_ROWS + ' แถว ส่วนที่เกินไม่ได้วาง';
+      if (p.multiline) msg += ' ข้อมูลที่วางมีช่องข้อความหลายบรรทัดหรือเครื่องหมายคำพูด ตรวจว่าจำนวนแถวตรงกับในชีต';
+      setPasteStatus(cut || p.multiline ? 'warn' : '', msg);
+      if (at === 0 && T.copied) setStale(true);
+      setStatus($('tm-copy-status'), '', '');
+      $('tm-copy-fallback').hidden = true;
+      focusRow(Math.min(at + vals.length, T.rows.length - 1));
+    }
+
+    // Where a paste of several cells goes while the table is on screen:
+    //   into a date box of the table      from that row downward
+    //   into a box of the reference       to row 1 (several cells can never be one EDC or one GA)
+    //   with no box in focus              to row 1 (for example straight after pressing a copy button)
+    // The last two only act when the text holds at least one readable date.
+    // A paste of one cell is left to the browser, which puts it into the box as usual.
+    document.addEventListener('paste', function (e) {
+      if ($('panel-research').hidden || $('research-table').hidden) return;
+      var t = e.target, i = rowOf(t);
+      var inAnchor = !!(t && t.id && /^tm-(edc|ga-w|ga-d|ga-date)$/.test(t.id));
+      var editable = !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable));
+      if (i < 0 && !inAnchor && editable) return;
+      var cd = e.clipboardData || window.clipboardData;
+      var text = cd ? cd.getData('text') : '';
+      if (!text || !/[\t\r\n]/.test(text.replace(/[\r\n]+$/, ''))) return;
+      e.preventDefault();
+      var p = C.parsePastedDates(text, {});
+      if (i < 0 && !p.dates) {
+        setPasteStatus('warn', 'ข้อความที่วางไม่มีวันที่ที่อ่านได้ จึงไม่ได้วางลงตาราง');
+        return;
+      }
+      placeRows(i < 0 ? 0 : i, p);
+    });
+
+    // Enter walks through the reference boxes and lands on row 1, ready for Ctrl+V.
+    [['tm-edc', null], ['tm-ga-w', 'tm-ga-d'], ['tm-ga-d', 'tm-ga-date'], ['tm-ga-date', null]].forEach(function (pair) {
+      $(pair[0]).addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        e.preventDefault();
+        if (pair[1]) { $(pair[1]).focus(); $(pair[1]).select(); } else focusRow(0);
+      });
+    });
+
+    /* ---------- Copy back (step 3) ---------- */
+    function copy(withEdc, btn) {
+      var status = $('tm-copy-status'), edc = edcInUse();
+      $('tm-copy-fallback').hidden = true;
+      paintAll();
+      if (edc == null) { setStatus(status, 'err', 'ใส่ค่าอ้างอิงในขั้นที่ 1 ก่อน'); return; }
+      var out = C.tableClipboardText(T.res, withEdc ? { edcText: C.fmtDMYEra(edc, copyEra()) } : {});
+      if (!out.rows) { setStatus(status, 'err', 'ใส่วันที่รับบริการในขั้นที่ 2 ก่อน'); return; }
+      if (!out.filled) { setStatus(status, 'err', 'ยังไม่มีแถวที่คำนวณได้ ดูหมายเหตุในตาราง'); return; }
+      var where = withEdc ? 'วางที่ช่อง EDC ของแถวแรกในชีต จะได้ 3 คอลัมน์ EDC, ga_week, ga_days'
+        : 'วางที่ช่อง ga_week ของแถวแรกในชีต';
+      var check = T.stale ? ' ค่าอ้างอิงยังเป็นค่าเดิม ตรวจก่อนวาง' : '';
+      copyText(out.text, $('tm-copy-fallback'), function () {
+        T.copied = true;
+        setStatus(status, T.stale ? 'warn' : 'ok', 'คัดลอกแล้ว ' + counts(out) + ' ' + where + check);
+        btn.focus();
+      }, function () {
+        T.copied = true;
+        setStatus(status, T.stale ? 'warn' : '', 'เลือกผลลัพธ์ ' + counts(out) + ' ให้แล้ว กด Ctrl+C เพื่อคัดลอก จากนั้น' + where + check);
+      });
+    }
+    $('tm-copy').addEventListener('click', function () { copy(false, this); });
+    $('tm-copy-edc').addEventListener('click', function () { copy(true, this); });
+
+    function resetStatus() {
+      T.copied = false;
+      setStale(false);
+      $('tm-copy-fallback').hidden = true;
+      setStatus($('tm-copy-status'), '', '');
+    }
+
+    $('tm-clear').addEventListener('click', function () {
+      ['tm-edc', 'tm-ga-w', 'tm-ga-d', 'tm-ga-date'].forEach(function (id) {
+        $(id).value = ''; $(id).classList.remove('invalid'); $(id).dataset.dirty = '';
+      });
+      ['tm-edc-picker', 'tm-ga-date-picker'].forEach(function (id) { $(id).value = ''; });
+      T.edcDay = T.gaDate = T.ga = null;
+      T.edcErr = T.gaDateErr = T.gaErr = null;
+      T.rows = [];
+      resetStatus();
+      setPasteStatus('', '');
+      renderAnchor();
+      rebuild();
+      $(T.anchor === 'edc' ? 'tm-edc' : 'tm-ga-w').focus();
+    });
+
+    $('tm-example').addEventListener('click', function () {
+      $('tm-edc').value = EXAMPLE.edc;
+      handleEdc(true);
+      T.rows = EXAMPLE.dates.slice();
+      resetStatus();
+      rebuild();
+      setPasteStatus('', 'ตัวอย่างสมมติ ' + EXAMPLE.dates.length + ' แถว แถวสุดท้ายตั้งใจให้เกินช่วงตั้งครรภ์ เพื่อให้เห็นแถวที่เว้นว่าง');
+    });
+
+    return {
+      ensure: function () { if (!ready) { ready = true; renderAnchor(); rebuild(); } },
+      _state: T
+    };
+  })();
+
+  /* ================================================================
    * Start
    * ================================================================ */
   buildWheel();
@@ -1169,5 +1562,5 @@
   }
   selectTab(startTab);
 
-  window.PregWheel = { state: state, recompute: recompute, checkToday: checkToday, research: Research };
+  window.PregWheel = { state: state, recompute: recompute, checkToday: checkToday, research: Research, table: TableMode };
 })();

@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Dpf68r6cEfVQsRyFS1EL6Ut+tGeLOUqAxeo5LsfJu7o=' 'sha256-jQNv1lwHyYsDZQaDAjTYdVhF8mZ7aGSru9uRZmqF8xk=' 'sha256-0gYfulAi7nHaRuZClQ4j+bqJ/kXpicnTyuPqSztbDlc='; style-src 'sha256-Ul+JD/kmqGvxsHJHqLBf/92APTHBdivWzDfVxPxUP38='; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-fIPmHkcIYJmJkClCT5ykDmFTEwRbvDsZoIpEpoib0Cg=' 'sha256-46g5x9QQayK2T98UlhjD8vCkeiKrgSjf4mrjLkAzndU=' 'sha256-0gYfulAi7nHaRuZClQ4j+bqJ/kXpicnTyuPqSztbDlc='; style-src 'sha256-YFLTXIfjAY6AX9m2b7tRFURnJBcUoXQzwEgK+exrSjw='; font-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex, nofollow">
@@ -430,6 +430,73 @@ table.preview tr.st-warn td.note { color: var(--warn); }
 .colguide dd { margin: 0; color: var(--muted); }
 @media (max-width: 560px) { .colguide dl { grid-template-columns: minmax(0, 1fr); } .colguide dd { margin-bottom: 6px; } }
 
+/* Research: table mode (one woman at a time) and the switch to file mode */
+.mode-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; }
+.mode-bar .privacy { font-size: 0.92rem; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
+.seg-btn {
+  appearance: none; border: 0; background: none; min-height: 36px; padding: 0 14px; border-radius: 7px;
+  cursor: pointer; color: var(--muted); font-weight: 500; font-size: 0.94rem;
+}
+.seg-btn:hover { color: var(--ink); }
+.seg-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.anchor { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.anchor-opt {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+}
+.anchor-opt:has(input[type="radio"]:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.anchor-opt .pick { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; font-weight: 500; cursor: pointer; }
+.anchor-opt .pick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.anchor-opt .wd input { width: 58px; }
+.stale { margin: 10px 0 0; padding: 8px 12px; border-radius: var(--radius); background: var(--warn-soft); color: var(--warn); font-size: 0.92rem; }
+.dl-status.warn { color: var(--warn); }
+
+.grid-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 10px; }
+.step-hint { margin: 0; color: var(--muted); font-size: 0.92rem; max-width: 70ch; }
+.tgrid-wrap { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
+table.tgrid { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+table.tgrid th, table.tgrid td { height: 40px; padding: 0 10px; text-align: left; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+table.tgrid th:last-child, table.tgrid td:last-child { border-right: 0; }
+table.tgrid tbody tr:last-child td { border-bottom: 0; }
+table.tgrid thead th { background: var(--surface-2); color: var(--muted); font-weight: 500; font-size: 0.84rem; white-space: nowrap; }
+table.tgrid .rn { width: 44px; text-align: center; color: var(--muted); font-size: 0.84rem; }
+table.tgrid td.in { padding: 0; width: 190px; min-width: 150px; }
+table.tgrid td.in input {
+  display: block; width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 0; background: transparent;
+  font-size: 1rem; font-variant-numeric: tabular-nums;
+}
+table.tgrid td.in input:focus { outline: 2px solid var(--focus); outline-offset: -2px; background: var(--surface-2); }
+table.tgrid td.rd { width: 150px; color: var(--muted); font-size: 0.88rem; white-space: nowrap; }
+table.tgrid th.out, table.tgrid td.out { width: 92px; text-align: center; background: var(--accent-soft); }
+table.tgrid thead th.out { color: var(--accent); font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; }
+table.tgrid td.out { color: var(--accent); font-weight: 600; font-size: 1.02rem; }
+table.tgrid td.note { color: var(--warn); font-size: 0.88rem; min-width: 150px; }
+table.tgrid tr.st-bad td.in input { color: var(--err); }
+table.tgrid tr.st-bad td.note { color: var(--err); }
+@media (max-width: 560px) {
+  /* a phone shows the date and the two results; the note is reached by sliding the table */
+  table.tgrid th, table.tgrid td { padding: 0 6px; }
+  table.tgrid .rd { display: none; }
+  table.tgrid .rn { width: 30px; }
+  table.tgrid td.in { width: auto; min-width: 116px; }
+  table.tgrid td.in input { padding: 0 6px; }
+  table.tgrid th.out, table.tgrid td.out { width: 68px; }
+  table.tgrid thead th.out { font-size: 0.78rem; }
+}
+.paste-status { margin: 8px 0 0; min-height: 1.4em; font-size: 0.9rem; color: var(--muted); }
+.paste-status.warn { color: var(--warn); }
+.legend { margin: 2px 0 0; font-size: 0.86rem; color: var(--muted); }
+.sw.out { background: var(--accent-soft); border: 1px solid var(--accent); }
+.colguide.plain dt { font-family: inherit; font-size: 0.9rem; font-weight: 500; }
+.tm-summary { margin: 0; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+#tm-copy-status { margin: 8px 0 0; min-height: 1.4em; }
+#tm-copy-fallback {
+  width: 100%; margin-top: 8px; min-height: 110px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  padding: 8px; background: var(--surface-2); font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; font-size: 0.86rem;
+}
+
 /* "Can't remember LMP" checkbox */
 .uncertain {
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
@@ -514,7 +581,7 @@ table.preview tr.st-warn td.note { color: var(--warn); }
 
   <nav class="tabs" role="tablist" aria-label="โหมดการใช้งาน">
     <button class="tab" role="tab" id="tab-clinic" aria-controls="panel-clinic" aria-selected="true">รายคน</button>
-    <button class="tab" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false">งานวิจัย (ไฟล์ Excel/CSV)</button>
+    <button class="tab" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false">งานวิจัย (ตาราง หรือไฟล์)</button>
   </nav>
 
   <main>
@@ -673,10 +740,106 @@ table.preview tr.st-warn td.note { color: var(--warn); }
     </section>
 
     <section id="panel-research" role="tabpanel" aria-labelledby="tab-research" hidden>
-      <p class="research-lead">
-        ใช้กับไฟล์ที่มีหลายราย ระบบใช้กฎเดียวกับหน้ารายคน แล้วเพิ่มคอลัมน์ผลลัพธ์ต่อท้ายคอลัมน์เดิม
+      <div class="mode-bar">
+        <div class="seg" role="group" aria-label="วิธีใส่ข้อมูล">
+          <button type="button" class="seg-btn" id="mode-table" aria-pressed="true">ตาราง</button>
+          <button type="button" class="seg-btn" id="mode-file" aria-pressed="false">ไฟล์ Excel/CSV</button>
+        </div>
         <span class="privacy"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>คำนวณในเบราว์เซอร์นี้ ข้อมูลไม่ถูกส่งออกจากเครื่อง</span>
-      </p>
+      </div>
+
+      <div id="research-table">
+      <p class="research-lead">ทำทีละคน ใส่ EDC ที่ถูกต้องของผู้ป่วย แล้ววางวันที่รับบริการจาก Google Sheet ระบบคำนวณ GA เป็นสัปดาห์และวัน ให้คัดลอกกลับไปวางในชีต โหมดนี้ไม่เทียบ LMP กับ US ระบบคำนวณจาก EDC ที่ใส่เท่านั้น</p>
+      <ol class="steps">
+        <li class="step">
+          <h3 id="tm-anchor-title">ค่าอ้างอิงของผู้ป่วยรายนี้</h3>
+          <div class="anchor" role="radiogroup" aria-labelledby="tm-anchor-title">
+            <div class="anchor-opt">
+              <label class="pick"><input type="radio" name="tm-anchor" id="tm-by-edc" value="edc" checked><span>EDC ที่ถูกต้อง</span></label>
+              <div class="datefield">
+                <input id="tm-edc" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-label="EDC ที่ถูกต้อง" aria-describedby="tm-anchor-echo">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="tm-edc-picker" aria-label="เลือก EDC จากปฏิทิน">
+                </label>
+              </div>
+            </div>
+            <div class="anchor-opt">
+              <label class="pick"><input type="radio" name="tm-anchor" id="tm-by-ga" value="ga"><span>หรือ GA</span></label>
+              <div class="wd" role="group" aria-label="GA ณ วันที่ที่ทราบ">
+                <input id="tm-ga-w" type="text" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="สัปดาห์" aria-describedby="tm-anchor-echo">
+                <span>สัปดาห์</span>
+                <input id="tm-ga-d" type="text" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="0" aria-label="วัน" aria-describedby="tm-anchor-echo">
+                <span>วัน ณ วันที่</span>
+              </div>
+              <div class="datefield">
+                <input id="tm-ga-date" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                  placeholder="วว/ดด/ปปปป" aria-label="วันที่ที่ทราบ GA" aria-describedby="tm-anchor-echo">
+                <label class="picker" title="เลือกจากปฏิทิน">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                  <input type="date" id="tm-ga-date-picker" aria-label="เลือกวันที่ที่ทราบ GA จากปฏิทิน">
+                </label>
+              </div>
+            </div>
+          </div>
+          <p class="echo" id="tm-anchor-echo" aria-live="polite"></p>
+        </li>
+        <li class="step">
+          <h3>วันที่รับบริการ</h3>
+          <div class="grid-head">
+            <p class="step-hint">พิมพ์ทีละช่อง หรือคัดลอกคอลัมน์วันที่จาก Google Sheet แล้วคลิกช่องแรกและกด Ctrl+V แถวจะเรียงตรงกับในชีต</p>
+            <button type="button" class="btn small" id="tm-example">ลองตัวอย่าง (สมมติ)</button>
+          </div>
+          <div class="tgrid-wrap">
+            <table class="tgrid" id="tm-grid">
+              <thead>
+                <tr>
+                  <th scope="col" class="rn">#</th>
+                  <th scope="col">วันที่รับบริการ</th>
+                  <th scope="col" class="rd">อ่านเป็น</th>
+                  <th scope="col" class="out">ga_week</th>
+                  <th scope="col" class="out">ga_days</th>
+                  <th scope="col">หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody id="tm-body"></tbody>
+            </table>
+          </div>
+          <p class="paste-status" id="tm-paste-status" role="status"></p>
+          <p class="legend"><span class="sw out"></span>ช่องที่ระบบคำนวณให้ แถวที่คำนวณไม่ได้จะเว้นว่าง เพื่อให้วางกลับแล้วแถวไม่เลื่อน</p>
+        </li>
+        <li class="step">
+          <h3>คัดลอกไปวางใน Google Sheet</h3>
+          <p class="tm-summary" id="tm-summary"></p>
+          <p class="stale" id="tm-stale" role="status" hidden>วันที่ชุดนี้เพิ่งวางใหม่ แต่ค่าอ้างอิงในขั้นที่ 1 ยังเป็นค่าเดิมที่คัดลอกผลไปแล้ว ถ้าเป็นผู้ป่วยรายใหม่ ให้แก้ค่าอ้างอิงก่อนคัดลอก</p>
+          <div class="row">
+            <button type="button" class="btn primary" id="tm-copy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>
+              คัดลอก ga_week และ ga_days
+            </button>
+            <button type="button" class="btn" id="tm-copy-edc">คัดลอกพร้อม EDC</button>
+            <button type="button" class="btn" id="tm-clear">ล้าง เริ่มคนถัดไป</button>
+          </div>
+          <p class="dl-status" id="tm-copy-status" role="status"></p>
+          <textarea id="tm-copy-fallback" readonly hidden aria-label="ผลลัพธ์สำหรับคัดลอก"></textarea>
+          <details class="colguide plain">
+            <summary>วิธีคำนวณ และแถวที่เว้นว่าง</summary>
+            <dl>
+              <dt>ga_week, ga_days</dt><dd>GA ณ วันที่รับบริการ นับจาก EDC ที่ใช้ จำนวนวันของ GA คือ 280 ลบด้วยจำนวนวันจากวันที่รับบริการถึง EDC แล้วแยกเป็นสัปดาห์เต็ม กับวันที่เหลือ 0 ถึง 6</dd>
+              <dt>GA ณ วันที่</dt><dd>ถ้าใส่ค่าอ้างอิงเป็น GA ณ วันที่ ระบบหา EDC จากวันที่นั้น + 280 วัน ลบ GA ส่วน GA 0 สัปดาห์ 0 วัน แปลว่าวันนั้นคือ LMP</dd>
+              <dt>แถวที่เว้นว่าง</dt><dd>อ่านวันที่ไม่ได้ วันที่อยู่ก่อนเริ่มตั้งครรภ์ หรือ GA เกิน 44+6 สัปดาห์ ส่วน GA ที่เกิน 44 สัปดาห์แต่ไม่เกิน 44+6 ยังแสดงค่า พร้อมหมายเหตุให้ตรวจวันที่</dd>
+              <dt>การอ่านวันที่</dt><dd>วันมาก่อนเดือนเสมอ ปี 4 หลักตั้งแต่ 2400 อ่านเป็น พ.ศ. ต่ำกว่านั้นอ่านเป็น ค.ศ. ส่วนปี 2 หลักอ่านเป็น พ.ศ. คอลัมน์ อ่านเป็น แสดงวันที่ที่ระบบเข้าใจ</dd>
+              <dt>คัดลอกพร้อม EDC</dt><dd>ได้ 3 คอลัมน์ เรียง EDC, ga_week, ga_days ให้วางที่ช่อง EDC ของแถวแรก EDC เขียนแบบ วว/ดด/ปปปป ใช้ปีแบบเดียวกับวันที่ที่วางมา ชีตจึงต้องอ่านวันที่แบบวันก่อนเดือน</dd>
+              <dt>การวาง</dt><dd>วางหลายช่องพร้อมกัน จะแทนที่ตารางตั้งแต่แถวที่คลิกลงไป ถ้าคัดลอกมาหลายคอลัมน์ ระบบใช้คอลัมน์ที่อ่านเป็นวันที่ได้มากที่สุด</dd>
+            </dl>
+          </details>
+        </li>
+      </ol>
+      </div>
+
+      <div id="research-file" hidden>
+      <p class="research-lead">ใช้กับไฟล์ที่มีหลายราย ระบบใช้กฎเดียวกับหน้ารายคน แล้วเพิ่มคอลัมน์ผลลัพธ์ต่อท้ายคอลัมน์เดิม</p>
       <ol class="steps">
         <li class="step">
           <h3>เลือกไฟล์</h3>
@@ -761,6 +924,7 @@ table.preview tr.st-warn td.note { color: var(--warn); }
           </details>
         </li>
       </ol>
+      </div>
     </section>
   </main>
 
@@ -843,6 +1007,7 @@ table.preview tr.st-warn td.note { color: var(--warn); }
 
   var MS_PER_DAY = 86400000;
   var MAX_INPUT_CHARS = 60;       // longer text is never a date or GA; refusing it keeps the regexes fast
+  var MAX_TABLE_ROWS = 2000;      // table mode keeps this many rows; a longer paste is cut and the page says so
   var EXCEL_EPOCH_OFFSET = 25569; // Excel serial of 1970-01-01 (1900 date system)
   var EXCEL_1904_SHIFT = 1462;    // days between the 1900 and 1904 date systems
   var EXCEL_MAX_SERIAL = 2958465; // 9999-12-31
@@ -916,6 +1081,15 @@ table.preview tr.st-warn td.note { color: var(--warn); }
     var p = ymdFromDay(n);
     return pad2(p.d) + '/' + pad2(p.m) + '/' + (p.y + BE_OFFSET);
   }
+
+  function fmtDMYCE(n) {
+    if (n == null) return '';
+    var p = ymdFromDay(n);
+    return pad2(p.d) + '/' + pad2(p.m) + '/' + p.y;
+  }
+
+  // dd/mm/yyyy in the calendar asked for: 'CE', or B.E. for anything else.
+  function fmtDMYEra(n, era) { return era === 'CE' ? fmtDMYCE(n) : fmtDMYBE(n); }
 
   function fmtISO(n) {
     if (n == null) return '';
@@ -1471,15 +1645,160 @@ table.preview tr.st-warn td.note { color: var(--warn); }
     return cells;
   }
 
+  /* ------------------------------------------------------------------
+   * Table mode (research tab): one pregnancy, many service dates
+   * The EDC is given by the user, either directly or as "GA w+d on a date", and is
+   * taken as final: no LMP versus U/S rule runs here. Each service date gets GA in
+   * weeks and days, in the same row order, for pasting back beside the dates in a
+   * spreadsheet. A row that cannot be calculated stays in place with blank cells.
+   * ------------------------------------------------------------------ */
+
+  // The two boxes of "GA [weeks] [days] on a date". "12+3" or "12w3d" typed into the weeks
+  // box is accepted and reported as split, so the page can fill both boxes.
+  // Unlike a U/S reading, 0+0 is allowed: it means the date is the first day of the LMP.
+  // soft: the text may simply be unfinished, so the page waits until the box is left.
+  function parseAnchorGA(wRaw, dRaw) {
+    var ws = normalizeDigits(wRaw == null ? '' : wRaw).trim();
+    var ds = normalizeDigits(dRaw == null ? '' : dRaw).trim();
+    if (ws.length > MAX_INPUT_CHARS || ds.length > MAX_INPUT_CHARS) return { ok: false, field: 'w', error: 'ข้อความยาวเกินไป' };
+    if (!ws && !ds) return { ok: false, empty: true };
+    var w, d, split = false;
+    if (/[^\d]/.test(ws)) {
+      var m = ws.match(/^(\d{1,2})\s*\+\s*(\d)$/);
+      if (m) { w = parseInt(m[1], 10); d = parseInt(m[2], 10); }
+      else {
+        var g = parseGA(ws, {});
+        if (!g.ok) return { ok: false, soft: true, field: 'w', error: 'พิมพ์สัปดาห์เป็นตัวเลข เช่น 12 แล้วใส่วันในช่องถัดไป' };
+        w = Math.floor(g.days / 7); d = g.days - w * 7;
+      }
+      split = true;
+    } else {
+      if (!ws) return { ok: false, soft: true, field: 'w', error: 'ใส่จำนวนสัปดาห์' };
+      if (!/^\d*$/.test(ds)) return { ok: false, field: 'd', error: 'วันต้องเป็น 0 ถึง 6' };
+      w = parseInt(ws, 10); d = ds ? parseInt(ds, 10) : 0;
+    }
+    if (d > 6) return { ok: false, field: 'd', error: 'วันต้องเป็น 0 ถึง 6' };
+    if (w * 7 + d > MAX_GA_DAYS) return { ok: false, field: 'w', error: 'GA ต้องไม่เกิน ' + fmtWD(MAX_GA_DAYS) };
+    return { ok: true, days: w * 7 + d, w: w, d: d, split: split };
+  }
+
+  // EDC from a GA that is known on any date (same arithmetic as a U/S reading).
+  function edcFromGAOn(day, gaDays) { return edcFromUS(day, gaDays); }
+
+  var TABLE_NOTE = {
+    BEFORE: 'วันที่อยู่ก่อนเริ่มตั้งครรภ์',
+    BEYOND: 'GA เกิน ' + fmtWD(MAX_GA_DAYS) + ' สัปดาห์',
+    LATE: 'GA เกิน ' + (WARN_GA_DAYS / 7) + ' สัปดาห์ ตรวจสอบวันที่'
+  };
+
+  // GA on one service date, counted from the EDC in use.
+  // status: 'empty' no text
+  //         'bad'   no GA: the date is unreadable (unread: true), before day 0 of the EDC,
+  //                 or beyond MAX_GA_DAYS. Given no GA on purpose, so that a date from another
+  //                 pregnancy or a typing error never reaches the sheet as a number.
+  //         'wait'  the date is readable but no EDC has been given yet
+  //         'ok'    GA in gaDays
+  //         'warn'  GA in gaDays, beyond WARN_GA_DAYS: shown, with a note to check the date
+  function gaForDate(edcDay, raw, opts) {
+    var p = parseDateValue(raw, opts || {});
+    if (p.empty) return { status: 'empty', day: null, era: null, gaDays: null, note: '' };
+    if (!p.ok) return { status: 'bad', unread: true, day: null, era: null, gaDays: null, note: p.error };
+    if (edcDay == null) return { status: 'wait', day: p.day, era: p.era, gaDays: null, note: '' };
+    var ga = gaOn(edcDay, p.day);
+    if (ga < 0) return { status: 'bad', day: p.day, era: p.era, gaDays: null, note: TABLE_NOTE.BEFORE };
+    if (ga > MAX_GA_DAYS) return { status: 'bad', day: p.day, era: p.era, gaDays: null, note: TABLE_NOTE.BEYOND };
+    var late = ga > WARN_GA_DAYS;
+    return { status: late ? 'warn' : 'ok', day: p.day, era: p.era, gaDays: ga, note: late ? TABLE_NOTE.LATE : '' };
+  }
+
+  // The calendar most of the readable dates were written in: 'BE', 'CE', or null when there
+  // is none or a tie. An EDC sent back to the sheet is written in the same calendar.
+  function majorityEra(results) {
+    var be = 0, ce = 0;
+    (results || []).forEach(function (r) {
+      if (!r || r.day == null) return;
+      if (r.era === 'BE') be++; else if (r.era === 'CE') ce++;
+    });
+    return be > ce ? 'BE' : (ce > be ? 'CE' : null);
+  }
+
+  // Text for the clipboard: one line per table row, tab between cells, CR LF between rows,
+  // which Google Sheets and Excel both paste as cells. Rows after the last row that has any
+  // text are left out. A row without a GA becomes empty cells, so the rows never shift.
+  // opts.edcText: when given, an EDC cell goes in front of ga_week and ga_days on rows that have a GA.
+  function tableClipboardText(results, opts) {
+    opts = opts || {};
+    var last = -1, i;
+    for (i = 0; i < results.length; i++) if (results[i] && results[i].status !== 'empty') last = i;
+    var lines = [], filled = 0;
+    for (i = 0; i <= last; i++) {
+      var r = results[i], has = !!r && r.gaDays != null;
+      var wd = has ? splitWD(r.gaDays) : null;
+      var cells = has ? [String(wd.w), String(wd.d)] : ['', ''];
+      if (opts.edcText != null) cells.unshift(has ? opts.edcText : '');
+      if (has) filled++;
+      lines.push(cells.join('\t'));
+    }
+    return { text: lines.join('\r\n'), rows: lines.length, filled: filled, blank: lines.length - filled };
+  }
+
+  // Text copied from Google Sheets or Excel: rows end with a line break, cells are separated
+  // by tabs, and a cell that holds a line break is quoted. When several columns were copied,
+  // the column with the most readable dates is taken as the service date (the leftmost on a tie).
+  // Empty rows inside the block are kept, because the results must line up with the sheet rows;
+  // empty rows at the end are dropped. dates: how many of the kept values read as a date.
+  // multiline: a cell held a line break or a stray quote mark, so the page asks the user to
+  // check that the number of rows matches the sheet.
+  function parsePastedDates(text, opts) {
+    text = String(text == null ? '' : text);
+    var hasBreak = function (v) { return /[\r\n]/.test(v); };
+    var grid = parseCSV(text, '\t');
+    // A cell that begins with a quote mark without being a quoted cell makes the parser
+    // swallow the cells and rows after it, which would shift every row below. A real quoted
+    // cell never holds a tab, so a field with both a line break and a tab gives that away:
+    // the text is then read again line by line, every quote mark taken as an ordinary character.
+    var swallowed = grid.some(function (r) {
+      return r.some(function (v) { return hasBreak(v) && v.indexOf('\t') >= 0; });
+    });
+    if (swallowed) {
+      var plain = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;   // a byte-order mark is not data
+      var lines = plain.split(/\r\n|\n|\r/);
+      if (lines.length && lines[lines.length - 1] === '') lines.pop();
+      grid = lines.map(function (l) { return l.split('\t'); });
+    }
+    var multiline = swallowed || grid.some(function (r) { return r.some(hasBreak); });
+    var cols = grid.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+    var col = 0;
+    if (cols > 1) {
+      var best = -1;
+      for (var j = 0; j < cols; j++) {
+        var n = 0;
+        for (var i = 0; i < grid.length && i < MAX_TABLE_ROWS; i++) {
+          if (parseDateValue(grid[i][j], opts || {}).ok) n++;
+        }
+        if (n > best) { best = n; col = j; }
+      }
+    }
+    var values = grid.map(function (r) {
+      var v = r[col];
+      return v == null ? '' : String(v).replace(/\s+/g, ' ').trim();
+    });
+    while (values.length && values[values.length - 1] === '') values.pop();
+    var total = values.length;
+    if (total > MAX_TABLE_ROWS) values = values.slice(0, MAX_TABLE_ROWS);
+    var dates = values.filter(function (v) { return parseDateValue(v, opts || {}).ok; }).length;
+    return { values: values, cols: cols, col: col, total: total, cut: total > values.length, dates: dates, multiline: multiline };
+  }
+
   function dayToExcelSerial(day) { return day + EXCEL_EPOCH_OFFSET; }
 
   return {
     DAYS_LMP_TO_EDC: DAYS_LMP_TO_EDC, REDATING_BANDS: REDATING_BANDS, MAX_GA_DAYS: MAX_GA_DAYS,
-    WARN_GA_DAYS: WARN_GA_DAYS, BE_OFFSET: BE_OFFSET,
+    WARN_GA_DAYS: WARN_GA_DAYS, BE_OFFSET: BE_OFFSET, MAX_TABLE_ROWS: MAX_TABLE_ROWS,
     TH_MONTHS: TH_MONTHS, TH_MONTHS_ABBR: TH_MONTHS_ABBR, TH_WEEKDAYS: TH_WEEKDAYS,
     dayFromYMD: dayFromYMD, ymdFromDay: ymdFromDay, localToday: localToday,
     msUntilNextLocalMidnight: msUntilNextLocalMidnight, weekdayIndex: weekdayIndex,
-    fmtThai: fmtThai, fmtThaiLong: fmtThaiLong, fmtDMYBE: fmtDMYBE, fmtISO: fmtISO,
+    fmtThai: fmtThai, fmtThaiLong: fmtThaiLong, fmtDMYBE: fmtDMYBE, fmtDMYCE: fmtDMYCE, fmtDMYEra: fmtDMYEra, fmtISO: fmtISO,
     splitWD: splitWD, fmtWD: fmtWD, fmtWDThai: fmtWDThai, trimesterOf: trimesterOf,
     normalizeDigits: normalizeDigits, parseDateText: parseDateText, parseDateValue: parseDateValue,
     parseGA: parseGA, gaFromWD: gaFromWD,
@@ -1488,6 +1807,8 @@ table.preview tr.st-warn td.note { color: var(--warn); }
     reportLine: reportLine, naegeleEDC: naegeleEDC, checkBookEDC: checkBookEDC,
     decodeText: decodeText, parseCSV: parseCSV, toCSV: toCSV,
     processRow: processRow, outputHeaders: outputHeaders, outputCells: outputCells,
+    parseAnchorGA: parseAnchorGA, edcFromGAOn: edcFromGAOn, TABLE_NOTE: TABLE_NOTE, gaForDate: gaForDate,
+    majorityEra: majorityEra, tableClipboardText: tableClipboardText, parsePastedDates: parsePastedDates,
     dayToExcelSerial: dayToExcelSerial, isEmptyCell: isEmptyCell
   };
 });
@@ -2115,8 +2436,21 @@ table.preview tr.st-warn td.note { color: var(--warn); }
     $('panel-clinic').hidden = !clinic;
     $('panel-research').hidden = clinic;
     try { localStorage.setItem('pregwheel-tab', clinic ? 'clinic' : 'research'); } catch (e) { /* storage unavailable */ }
-    if (!clinic) Research.ensure();
+    if (!clinic) selectResearchMode($('mode-file').getAttribute('aria-pressed') === 'true' ? 'file' : 'table');
   }
+
+  // The research tab has two ways to give the data. The table (one woman at a time, typed
+  // or pasted) opens first; the Excel/CSV file mode stays one click away.
+  function selectResearchMode(mode) {
+    var table = mode !== 'file';
+    $('mode-table').setAttribute('aria-pressed', String(table));
+    $('mode-file').setAttribute('aria-pressed', String(!table));
+    $('research-table').hidden = !table;
+    $('research-file').hidden = table;
+    if (table) TableMode.ensure(); else Research.ensure();
+  }
+  $('mode-table').addEventListener('click', function () { selectResearchMode('table'); });
+  $('mode-file').addEventListener('click', function () { selectResearchMode('file'); });
   $('tab-clinic').addEventListener('click', function () { selectTab('clinic'); });
   $('tab-research').addEventListener('click', function () { selectTab('research'); });
   document.querySelector('.tabs').addEventListener('keydown', function (e) {
@@ -2645,6 +2979,386 @@ table.preview tr.st-warn td.note { color: var(--warn); }
   })();
 
   /* ================================================================
+   * Copying to the clipboard
+   * The async clipboard API comes first. Where the page may not use it (an embedded
+   * viewer, an older browser), the text is copied through a selected text box. If that
+   * fails too, the box stays open and selected, so Ctrl+C finishes the job.
+   * ================================================================ */
+  function copyText(text, box, done, manual) {
+    function legacy() {
+      box.hidden = false;
+      box.value = text;
+      box.focus();
+      box.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) { box.hidden = true; done(); } else manual();
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { box.hidden = true; done(); }, legacy);
+      } else legacy();
+    } catch (e) { legacy(); }
+  }
+
+  /* ================================================================
+   * Research tab, table mode: one woman at a time.
+   * The EDC that is already settled is typed once, or given as GA w+d on a date. The
+   * service dates are typed or pasted from Google Sheets, and GA in weeks and days comes
+   * back in the same row order, ready to paste into the sheet. Nothing is stored or sent.
+   * ================================================================ */
+  var TableMode = (function () {
+    var MIN_ROWS = 6;
+    // Made-up numbers for the "try an example" button. Not from any patient.
+    var EXAMPLE = {
+      edc: '14/09/2022',
+      dates: ['8/2/2022', '18/3/2022', '4/5/2022', '23/6/2022', '12/8/2022', '6/9/2022', '20/10/2023']
+    };
+    var T = {
+      anchor: 'edc',                 // the reference in use: 'edc', or 'ga' (GA on a date)
+      edcDay: null, edcErr: null,
+      gaDate: null, gaDateErr: null,
+      ga: null, gaErr: null,         // GA of the reference, in days
+      rows: [],                      // text of each service-date box, in table order
+      res: [],                       // C.gaForDate() result for each row
+      copied: false,                 // results were copied and the reference has not changed since
+      stale: false                   // new dates were pasted over copied ones while the reference stayed the same
+    };
+    var ready = false;
+    var body = $('tm-body');
+
+    function edcInUse() {
+      if (T.anchor === 'edc') return T.edcDay;
+      return T.ga != null && T.gaDate != null ? C.edcFromGAOn(T.gaDate, T.ga) : null;
+    }
+
+    /* ---------- The reference (step 1) ---------- */
+    function shown(err) { return err && err !== 'pending' ? err : null; }
+
+    function renderAnchor() {
+      var edc = edcInUse(), err, text;
+      if (T.anchor === 'edc') {
+        err = shown(T.edcErr);
+        if (err) text = err + ' ลองพิมพ์แบบ 14/09/2565 หรือ 14/09/2022';
+        else if (edc != null) text = 'EDC ที่ใช้ ' + C.fmtThaiLong(edc) + ' (เทียบเท่า LMP ' + C.fmtThai(edc - C.DAYS_LMP_TO_EDC, true) + ')';
+        else text = 'ใส่ EDC ที่ถูกต้องของผู้ป่วยรายนี้ พิมพ์ปีเป็น พ.ศ. หรือ ค.ศ. ก็ได้';
+      } else {
+        err = shown(T.gaErr) || shown(T.gaDateErr);
+        if (err) text = err;
+        else if (edc != null) text = 'EDC ที่ใช้ ' + C.fmtThaiLong(edc) + ' คิดจาก GA ' + C.fmtWD(T.ga) + ' ณ ' + C.fmtThai(T.gaDate, true);
+        else if (T.ga != null) text = 'ใส่วันที่ที่ GA เท่ากับ ' + C.fmtWD(T.ga);
+        else if (T.gaDate != null) text = 'ใส่ GA ณ ' + C.fmtThai(T.gaDate, true);
+        else text = 'ใส่ GA และวันที่ที่ทราบ GA นั้น';
+      }
+      setEcho('tm-anchor-echo', err ? 'err' : (edc != null ? 'ok' : ''), text);
+    }
+
+    function use(mode) {
+      T.anchor = mode;
+      $('tm-by-edc').checked = mode === 'edc';
+      $('tm-by-ga').checked = mode === 'ga';
+    }
+
+    // The likeliest slip in a one-woman-at-a-time loop: the next woman's dates are pasted
+    // and the EDC of the woman before is still there. The results would look plausible.
+    // A warning beside the copy buttons stays until the reference is changed or cleared.
+    function setStale(on) {
+      T.stale = on;
+      $('tm-stale').hidden = !on;
+    }
+
+    // Any change of the reference: the old copy no longer matches what is on screen.
+    function anchorChanged() {
+      T.copied = false;
+      setStale(false);
+      renderAnchor();
+      paintAll();
+    }
+
+    var handleEdc = bindDateField('tm-edc', 'tm-edc-picker', function (day, err, empty) {
+      T.edcDay = day; T.edcErr = err;
+      if (!empty) use('edc');
+      anchorChanged();
+    });
+    bindDateField('tm-ga-date', 'tm-ga-date-picker', function (day, err, empty) {
+      T.gaDate = day; T.gaDateErr = err;
+      if (!empty) use('ga');
+      anchorChanged();
+    });
+
+    function readGA(final) {
+      var wEl = $('tm-ga-w'), dEl = $('tm-ga-d');
+      wEl.classList.remove('invalid'); dEl.classList.remove('invalid');
+      var r = C.parseAnchorGA(wEl.value, dEl.value);
+      if (r.ok) {
+        // "12+3" typed into the weeks box: split it into the two boxes
+        if (r.split) { wEl.value = String(r.w); dEl.value = String(r.d); }
+        T.ga = r.days; T.gaErr = null;
+      } else if (r.empty) {
+        T.ga = null; T.gaErr = null;
+      } else {
+        T.ga = null;
+        T.gaErr = r.soft && !final ? 'pending' : r.error;
+        if (T.gaErr !== 'pending') (r.field === 'd' ? dEl : wEl).classList.add('invalid');
+      }
+    }
+    ['tm-ga-w', 'tm-ga-d'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        readGA(false);
+        if ($('tm-ga-w').value.trim() || $('tm-ga-d').value.trim()) use('ga');
+        anchorChanged();
+      });
+      $(id).addEventListener('change', function () { readGA(true); anchorChanged(); });
+    });
+    $('tm-by-edc').addEventListener('change', function () { if (this.checked) { use('edc'); anchorChanged(); } });
+    $('tm-by-ga').addEventListener('change', function () { if (this.checked) { use('ga'); anchorChanged(); } });
+
+    /* ---------- The grid (step 2) ---------- */
+    function lastFilled() {
+      for (var i = T.rows.length - 1; i >= 0; i--) if (T.rows[i].trim() !== '') return i;
+      return -1;
+    }
+
+    // One free row after the last entry, never fewer than MIN_ROWS, never more than the cap.
+    function fitRows() {
+      var want = Math.min(C.MAX_TABLE_ROWS, Math.max(MIN_ROWS, lastFilled() + 2));
+      while (T.rows.length < want) T.rows.push('');
+      T.rows.length = want;
+    }
+
+    function makeRow(i) {
+      var tr = document.createElement('tr');
+      function td(cls) { var c = document.createElement('td'); c.className = cls; tr.appendChild(c); return c; }
+      td('rn').textContent = String(i + 1);
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'tdate';
+      inp.spellcheck = false;
+      inp.setAttribute('inputmode', 'decimal');
+      inp.setAttribute('autocomplete', 'off');
+      inp.setAttribute('aria-label', 'วันที่รับบริการ แถว ' + (i + 1));
+      if (i === 0) inp.placeholder = 'วว/ดด/ปปปป';
+      inp.value = T.rows[i];
+      td('in').appendChild(inp);
+      td('rd'); td('out'); td('out'); td('note');
+      return tr;
+    }
+
+    // typing: the box is being typed in, so a date that cannot be read yet is not an error
+    function paintRow(i, typing) {
+      var r = T.res[i] = C.gaForDate(edcInUse(), T.rows[i], {});
+      var tr = body.rows[i];
+      if (!tr) return;
+      var quiet = !!(typing && r.unread);
+      tr.className = 'st-' + (quiet ? 'wait' : r.status);
+      tr.cells[2].textContent = r.day != null ? C.fmtThai(r.day, true) : '';
+      var wd = r.gaDays != null ? C.splitWD(r.gaDays) : null;
+      tr.cells[3].textContent = wd ? String(wd.w) : '';
+      tr.cells[4].textContent = wd ? String(wd.d) : '';
+      tr.cells[5].textContent = quiet ? '' : r.note;
+    }
+
+    function paintAll() {
+      T.res = [];
+      for (var i = 0; i < T.rows.length; i++) paintRow(i, false);
+      renderSummary();
+    }
+
+    function rebuild() {
+      fitRows();
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < T.rows.length; i++) frag.appendChild(makeRow(i));
+      body.textContent = '';
+      body.appendChild(frag);
+      paintAll();
+    }
+
+    // Typing in the last row adds the next one, so a free row is always there.
+    function grow() {
+      var want = Math.min(C.MAX_TABLE_ROWS, lastFilled() + 2);
+      while (T.rows.length < want) {
+        T.rows.push('');
+        body.appendChild(makeRow(T.rows.length - 1));
+        paintRow(T.rows.length - 1, false);
+      }
+    }
+
+    function rowOf(el) {
+      if (!el || !el.classList || !el.classList.contains('tdate')) return -1;
+      return el.parentNode.parentNode.sectionRowIndex;
+    }
+
+    function focusRow(i) {
+      if (i < 0 || i >= T.rows.length) return;
+      var inp = body.rows[i].cells[1].firstChild;
+      inp.focus();
+      inp.select();
+    }
+
+    function setPasteStatus(kind, text) {
+      var el = $('tm-paste-status');
+      el.className = 'paste-status' + (kind ? ' ' + kind : '');
+      el.textContent = text;
+    }
+
+    // The EDC written back to the sheet uses the calendar of the pasted dates. With no
+    // readable date to go by, it follows the reference date as typed, then B.E.
+    function copyEra() {
+      var era = C.majorityEra(T.res);
+      if (!era) {
+        var p = C.parseDateText($(T.anchor === 'edc' ? 'tm-edc' : 'tm-ga-date').value, {});
+        era = p.ok ? p.era : null;
+      }
+      return era || 'BE';
+    }
+
+    function counts(out) {
+      return out.rows + ' แถว คำนวณได้ ' + out.filled + (out.blank ? ' เว้นว่าง ' + out.blank : '');
+    }
+
+    function renderSummary() {
+      var out = C.tableClipboardText(T.res, {}), edc = edcInUse(), text;
+      if (!out.rows) text = 'ยังไม่มีวันที่รับบริการ';
+      else if (edc == null) text = out.rows + ' แถว ยังไม่มีค่าอ้างอิง';
+      else text = counts(out) + ' · ใช้ EDC ' + C.fmtDMYEra(edc, copyEra());
+      $('tm-summary').textContent = text;
+    }
+
+    body.addEventListener('input', function (e) {
+      var i = rowOf(e.target);
+      if (i < 0) return;
+      T.rows[i] = e.target.value;
+      grow();
+      paintRow(i, true);
+      renderSummary();
+      setPasteStatus('', '');
+    });
+    body.addEventListener('focusout', function (e) {
+      var i = rowOf(e.target);
+      if (i >= 0) paintRow(i, false);
+    });
+    body.addEventListener('keydown', function (e) {
+      var i = rowOf(e.target);
+      if (i < 0 || e.isComposing) return;
+      if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); focusRow(i + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); focusRow(i - 1); }
+    });
+
+    // Several cells pasted at once replace the table from the clicked row downward. Rows
+    // left over from the woman before would otherwise be calculated with the new EDC.
+    function placeRows(at, p) {
+      var replaced = T.rows.slice(at).filter(function (v) { return v.trim() !== ''; }).length;
+      var vals = p.values.slice(0, Math.max(0, C.MAX_TABLE_ROWS - at));
+      T.rows = T.rows.slice(0, at).concat(vals);
+      rebuild();
+      var msg = 'วาง ' + vals.length + ' แถว' + (at > 0 ? ' ตั้งแต่แถว ' + (at + 1) : '');
+      if (p.cols > 1) msg += ' ใช้คอลัมน์ที่ ' + (p.col + 1) + ' จาก ' + p.cols + ' คอลัมน์เป็นวันที่รับบริการ';
+      if (replaced) msg += ' แทนที่ของเดิม ' + replaced + ' แถว';
+      var cut = p.cut || vals.length < p.values.length;
+      if (cut) msg += ' ตารางรับได้ ' + C.MAX_TABLE_ROWS + ' แถว ส่วนที่เกินไม่ได้วาง';
+      if (p.multiline) msg += ' ข้อมูลที่วางมีช่องข้อความหลายบรรทัดหรือเครื่องหมายคำพูด ตรวจว่าจำนวนแถวตรงกับในชีต';
+      setPasteStatus(cut || p.multiline ? 'warn' : '', msg);
+      if (at === 0 && T.copied) setStale(true);
+      setStatus($('tm-copy-status'), '', '');
+      $('tm-copy-fallback').hidden = true;
+      focusRow(Math.min(at + vals.length, T.rows.length - 1));
+    }
+
+    // Where a paste of several cells goes while the table is on screen:
+    //   into a date box of the table      from that row downward
+    //   into a box of the reference       to row 1 (several cells can never be one EDC or one GA)
+    //   with no box in focus              to row 1 (for example straight after pressing a copy button)
+    // The last two only act when the text holds at least one readable date.
+    // A paste of one cell is left to the browser, which puts it into the box as usual.
+    document.addEventListener('paste', function (e) {
+      if ($('panel-research').hidden || $('research-table').hidden) return;
+      var t = e.target, i = rowOf(t);
+      var inAnchor = !!(t && t.id && /^tm-(edc|ga-w|ga-d|ga-date)$/.test(t.id));
+      var editable = !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable));
+      if (i < 0 && !inAnchor && editable) return;
+      var cd = e.clipboardData || window.clipboardData;
+      var text = cd ? cd.getData('text') : '';
+      if (!text || !/[\t\r\n]/.test(text.replace(/[\r\n]+$/, ''))) return;
+      e.preventDefault();
+      var p = C.parsePastedDates(text, {});
+      if (i < 0 && !p.dates) {
+        setPasteStatus('warn', 'ข้อความที่วางไม่มีวันที่ที่อ่านได้ จึงไม่ได้วางลงตาราง');
+        return;
+      }
+      placeRows(i < 0 ? 0 : i, p);
+    });
+
+    // Enter walks through the reference boxes and lands on row 1, ready for Ctrl+V.
+    [['tm-edc', null], ['tm-ga-w', 'tm-ga-d'], ['tm-ga-d', 'tm-ga-date'], ['tm-ga-date', null]].forEach(function (pair) {
+      $(pair[0]).addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.isComposing) return;
+        e.preventDefault();
+        if (pair[1]) { $(pair[1]).focus(); $(pair[1]).select(); } else focusRow(0);
+      });
+    });
+
+    /* ---------- Copy back (step 3) ---------- */
+    function copy(withEdc, btn) {
+      var status = $('tm-copy-status'), edc = edcInUse();
+      $('tm-copy-fallback').hidden = true;
+      paintAll();
+      if (edc == null) { setStatus(status, 'err', 'ใส่ค่าอ้างอิงในขั้นที่ 1 ก่อน'); return; }
+      var out = C.tableClipboardText(T.res, withEdc ? { edcText: C.fmtDMYEra(edc, copyEra()) } : {});
+      if (!out.rows) { setStatus(status, 'err', 'ใส่วันที่รับบริการในขั้นที่ 2 ก่อน'); return; }
+      if (!out.filled) { setStatus(status, 'err', 'ยังไม่มีแถวที่คำนวณได้ ดูหมายเหตุในตาราง'); return; }
+      var where = withEdc ? 'วางที่ช่อง EDC ของแถวแรกในชีต จะได้ 3 คอลัมน์ EDC, ga_week, ga_days'
+        : 'วางที่ช่อง ga_week ของแถวแรกในชีต';
+      var check = T.stale ? ' ค่าอ้างอิงยังเป็นค่าเดิม ตรวจก่อนวาง' : '';
+      copyText(out.text, $('tm-copy-fallback'), function () {
+        T.copied = true;
+        setStatus(status, T.stale ? 'warn' : 'ok', 'คัดลอกแล้ว ' + counts(out) + ' ' + where + check);
+        btn.focus();
+      }, function () {
+        T.copied = true;
+        setStatus(status, T.stale ? 'warn' : '', 'เลือกผลลัพธ์ ' + counts(out) + ' ให้แล้ว กด Ctrl+C เพื่อคัดลอก จากนั้น' + where + check);
+      });
+    }
+    $('tm-copy').addEventListener('click', function () { copy(false, this); });
+    $('tm-copy-edc').addEventListener('click', function () { copy(true, this); });
+
+    function resetStatus() {
+      T.copied = false;
+      setStale(false);
+      $('tm-copy-fallback').hidden = true;
+      setStatus($('tm-copy-status'), '', '');
+    }
+
+    $('tm-clear').addEventListener('click', function () {
+      ['tm-edc', 'tm-ga-w', 'tm-ga-d', 'tm-ga-date'].forEach(function (id) {
+        $(id).value = ''; $(id).classList.remove('invalid'); $(id).dataset.dirty = '';
+      });
+      ['tm-edc-picker', 'tm-ga-date-picker'].forEach(function (id) { $(id).value = ''; });
+      T.edcDay = T.gaDate = T.ga = null;
+      T.edcErr = T.gaDateErr = T.gaErr = null;
+      T.rows = [];
+      resetStatus();
+      setPasteStatus('', '');
+      renderAnchor();
+      rebuild();
+      $(T.anchor === 'edc' ? 'tm-edc' : 'tm-ga-w').focus();
+    });
+
+    $('tm-example').addEventListener('click', function () {
+      $('tm-edc').value = EXAMPLE.edc;
+      handleEdc(true);
+      T.rows = EXAMPLE.dates.slice();
+      resetStatus();
+      rebuild();
+      setPasteStatus('', 'ตัวอย่างสมมติ ' + EXAMPLE.dates.length + ' แถว แถวสุดท้ายตั้งใจให้เกินช่วงตั้งครรภ์ เพื่อให้เห็นแถวที่เว้นว่าง');
+    });
+
+    return {
+      ensure: function () { if (!ready) { ready = true; renderAnchor(); rebuild(); } },
+      _state: T
+    };
+  })();
+
+  /* ================================================================
    * Start
    * ================================================================ */
   buildWheel();
@@ -2664,7 +3378,7 @@ table.preview tr.st-warn td.note { color: var(--warn); }
   }
   selectTab(startTab);
 
-  window.PregWheel = { state: state, recompute: recompute, checkToday: checkToday, research: Research };
+  window.PregWheel = { state: state, recompute: recompute, checkToday: checkToday, research: Research, table: TableMode };
 })();
 </script>
 <!-- SheetJS Community Edition 0.18.5, Apache License 2.0, https://sheetjs.com -->

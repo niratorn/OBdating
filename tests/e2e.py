@@ -43,6 +43,54 @@ def fill_date(page, sel, value):
     page.locator(sel).blur()
 
 
+def wait_until(page, expr, timeout_ms=8000):
+    """Poll with page.evaluate. page.wait_for_function re-checks a string predicate with
+    eval, which the page's Content-Security-Policy blocks, so it failed now and then."""
+    waited = 0
+    while waited <= timeout_ms:
+        if page.evaluate(expr):
+            return
+        page.wait_for_timeout(50)
+        waited += 50
+    raise AssertionError("timed out waiting for: " + expr)
+
+
+# ---- helpers for the table mode of the research tab ----
+GRID_JS = """Array.from(document.querySelectorAll('#tm-body tr')).map(function (tr) {
+  return { date: tr.cells[1].firstChild.value, read: tr.cells[2].textContent, w: tr.cells[3].textContent,
+           d: tr.cells[4].textContent, note: tr.cells[5].textContent, cls: tr.className }; })"""
+FOCUS_ROW_JS = """(function () {
+  var a = document.activeElement, tr = a && a.closest ? a.closest('#tm-body tr') : null;
+  return tr ? tr.sectionRowIndex : -1; })()"""
+
+
+def grid(page):
+    return page.evaluate(GRID_JS)
+
+
+def wd(rows):
+    return [r["w"] + "+" + r["d"] if r["w"] != "" else "" for r in rows]
+
+
+def put_clip(page, value):
+    page.evaluate("t => navigator.clipboard.writeText(t)", value)
+
+
+def get_clip(page):
+    return page.evaluate("navigator.clipboard.readText()")
+
+
+def paste_at(page, sel, value):
+    """Put text on the clipboard, focus sel, and press Ctrl+V: a real paste event."""
+    put_clip(page, value)
+    page.focus(sel)
+    page.keyboard.press("Control+V")
+
+
+def row_box(n):
+    return f"#tm-body tr:nth-child({n}) input"
+
+
 with sync_playwright() as p:
     browser = p.chromium.launch()
 
@@ -249,12 +297,277 @@ with sync_playwright() as p:
     page.screenshot(path=str(OUT / "clinic-dark.png"), full_page=True)
     ctx.close()
 
-    # ---------------- 3. Research tab ----------------
+    # ---------------- 3. Research tab, table mode: one woman at a time (requested 2026-10-03) ----------------
+    EX_DATES = ["8/2/2022", "18/3/2022", "4/5/2022", "23/6/2022", "12/8/2022", "6/9/2022", "20/10/2023"]
+    EX_COPY = "8\t6\r\n14\t2\r\n21\t0\r\n28\t1\r\n35\t2\r\n38\t6\r\n\t"
+    ctx = browser.new_context(timezone_id="Asia/Bangkok", locale="th-TH", accept_downloads=True,
+                              viewport={"width": 1280, "height": 900})
+    ctx.grant_permissions(["clipboard-read", "clipboard-write"])
+    page = ctx.new_page()
+    page_errors = []
+    page.on("pageerror", lambda e: page_errors.append(str(e)))
+    page.on("console", lambda m: page_errors.append(m.text) if m.type == "error" else None)
+    page.goto(PAGE, wait_until="domcontentloaded")
+    page.click("#tab-research")
+    check("table mode opens first", page.locator("#research-table").is_visible()
+          and not page.locator("#research-file").is_visible()
+          and page.get_attribute("#mode-table", "aria-pressed") == "true"
+          and page.get_attribute("#mode-file", "aria-pressed") == "false")
+    check("file mode not loaded until asked for", page.evaluate("PregWheel.research._state.src") is None)
+    g = grid(page)
+    check("table starts with 6 empty rows", len(g) == 6 and all(r["date"] == "" and r["w"] == "" for r in g), str(g))
+    check("table empty summary", text(page, "#tm-summary") == "ยังไม่มีวันที่รับบริการ", text(page, "#tm-summary"))
+    check("tab label names both modes", text(page, "#tab-research") == "งานวิจัย (ตาราง หรือไฟล์)", text(page, "#tab-research"))
+
+    # nothing to copy yet: each button says what is missing and copies nothing
+    put_clip(page, "untouched")
+    page.click("#tm-copy")
+    check("copy without reference", "ใส่ค่าอ้างอิงในขั้นที่ 1 ก่อน" in text(page, "#tm-copy-status"), text(page, "#tm-copy-status"))
+    page.fill("#tm-edc", "14/9/2022")
+    page.click("#tm-copy-edc")
+    check("copy without dates", "ใส่วันที่รับบริการในขั้นที่ 2 ก่อน" in text(page, "#tm-copy-status"), text(page, "#tm-copy-status"))
+    check("clipboard untouched when nothing to copy", get_clip(page) == "untouched", repr(get_clip(page)))
+
+    # reference as EDC, Enter lands on row 1, then a column pasted from Google Sheets (LF between rows)
+    page.focus("#tm-edc")
+    page.keyboard.press("Enter")
+    echo = text(page, "#tm-anchor-echo")
+    check("EDC echo", "วันพุธที่ 14 กันยายน พ.ศ. 2565" in echo and "เทียบเท่า LMP พ. 8 ธ.ค. 2564" in echo, echo)
+    check("Enter moves to row 1", page.evaluate(FOCUS_ROW_JS) == 0, str(page.evaluate(FOCUS_ROW_JS)))
+    put_clip(page, "\n".join(EX_DATES))
+    page.keyboard.press("Control+V")
+    g = grid(page)
+    check("pasted rows plus one free row", [r["date"] for r in g] == EX_DATES + [""], str([r["date"] for r in g]))
+    check("GA of the example rows", wd(g) == ["8+6", "14+2", "21+0", "28+1", "35+2", "38+6", "", ""], str(wd(g)))
+    check("date echoed as read", g[0]["read"] == "อ. 8 ก.พ. 2565" and g[6]["read"] == "ศ. 20 ต.ค. 2566", g[0]["read"] + " / " + g[6]["read"])
+    check("row beyond 44+6 left blank with a note", g[6]["note"] == "GA เกิน 44+6 สัปดาห์" and g[6]["cls"] == "st-bad", str(g[6]))
+    check("paste status", text(page, "#tm-paste-status") == "วาง 7 แถว", text(page, "#tm-paste-status"))
+    check("summary after paste", text(page, "#tm-summary") == "7 แถว คำนวณได้ 6 เว้นว่าง 1 · ใช้ EDC 14/09/2022", text(page, "#tm-summary"))
+    check("focus on the free row after a paste", page.evaluate(FOCUS_ROW_JS) == 7, str(page.evaluate(FOCUS_ROW_JS)))
+    page.screenshot(path=str(OUT / "table-desktop.png"), full_page=True)
+
+    # copy back: same number of lines as rows, blank cells where there is no GA
+    page.click("#tm-copy")
+    page.wait_for_timeout(100)
+    check("copy ga_week and ga_days", get_clip(page) == EX_COPY, repr(get_clip(page)))
+    st = text(page, "#tm-copy-status")
+    check("copy status", "คัดลอกแล้ว 7 แถว คำนวณได้ 6 เว้นว่าง 1" in st and "ช่อง ga_week ของแถวแรก" in st, st)
+    page.click("#tm-copy-edc")
+    page.wait_for_timeout(100)
+    lines = get_clip(page).split("\r\n")
+    check("copy with EDC: 3 cells a row", lines[0] == "14/09/2022\t8\t6" and lines[5] == "14/09/2022\t38\t6"
+          and lines[6] == "\t\t" and len(lines) == 7, repr(lines))
+    check("copy with EDC status", "ช่อง EDC ของแถวแรก" in text(page, "#tm-copy-status"), text(page, "#tm-copy-status"))
+    check("no fallback box when the clipboard works", not page.locator("#tm-copy-fallback").is_visible())
+
+    # next woman, dates pasted first (Excel style: CR LF, a trailing break, an empty cell inside),
+    # with no box in focus: the old rows go, and a warning says the reference is still the old one
+    check("no stale warning yet", not page.locator("#tm-stale").is_visible())
+    paste_at(page, "#tm-copy", "10/8/2022\r\n\r\n3/2/2022\r\n11/1/2022\r\n")
+    g = grid(page)
+    check("paste replaces the rows of the woman before", [r["date"] for r in g] == ["10/8/2022", "", "3/2/2022", "11/1/2022", "", ""], str([r["date"] for r in g]))
+    check("empty row inside keeps its place", wd(g) == ["35+0", "", "8+1", "4+6", "", ""], str(wd(g)))
+    check("replace status", text(page, "#tm-paste-status") == "วาง 4 แถว แทนที่ของเดิม 7 แถว", text(page, "#tm-paste-status"))
+    check("stale reference warning", page.locator("#tm-stale").is_visible())
+    check("old copy status cleared", text(page, "#tm-copy-status") == "", text(page, "#tm-copy-status"))
+    page.click("#tm-copy")
+    page.wait_for_timeout(100)
+    check("copy keeps the empty row", get_clip(page) == "35\t0\r\n\t\r\n8\t1\r\n4\t6", repr(get_clip(page)))
+    st = text(page, "#tm-copy-status")
+    check("a copy made under the warning says so", "ค่าอ้างอิงยังเป็นค่าเดิม ตรวจก่อนวาง" in st
+          and "warn" in page.get_attribute("#tm-copy-status", "class") and page.locator("#tm-stale").is_visible(), st)
+    paste_at(page, "#tm-copy", "10/8/2022\n19/4/2022")
+    check("warning stays for the next paste", page.locator("#tm-stale").is_visible())
+    page.fill("#tm-edc", "22/8/2022")
+    check("warning goes when the reference changes", not page.locator("#tm-stale").is_visible())
+    page.click("#tm-copy")
+    page.wait_for_timeout(100)
+    st = text(page, "#tm-copy-status")
+    check("copy after a new reference is plain again", "ตรวจก่อนวาง" not in st and "ok" in page.get_attribute("#tm-copy-status", "class"), st)
+    paste_at(page, row_box(1), "10/8/2022\n19/4/2022")
+    check("pasting again after that copy warns again", page.locator("#tm-stale").is_visible())
+    page.fill("#tm-edc", "22/08/2022")
+    check("warning cleared by retyping the reference", not page.locator("#tm-stale").is_visible())
+    check("rows follow the new EDC", wd(grid(page))[:2] == ["38+2", "22+1"], str(wd(grid(page))))
+
+    # several columns pasted into a later row: the date column is found, rows above stay
+    paste_at(page, row_box(3), "A1\t3/2/2022\t5\nA1\t11/1/2022\t2")
+    g = grid(page)
+    check("paste from row 3 keeps rows above", [r["date"] for r in g][:4] == ["10/8/2022", "19/4/2022", "3/2/2022", "11/1/2022"], str([r["date"] for r in g]))
+    check("multi-column status", text(page, "#tm-paste-status") == "วาง 2 แถว ตั้งแต่แถว 3 ใช้คอลัมน์ที่ 2 จาก 3 คอลัมน์เป็นวันที่รับบริการ", text(page, "#tm-paste-status"))
+    check("GA after a multi-column paste", wd(g)[:4] == ["38+2", "22+1", "11+3", "8+1"], str(wd(g)))
+
+    # a note cell with a line break inside: rows stay in place and the page asks for a check
+    paste_at(page, row_box(1), '10/8/2022\t"มาตามนัด\nนัดอีก 4 สัปดาห์"\n19/4/2022\tปกติ')
+    g = grid(page)
+    st = text(page, "#tm-paste-status")
+    check("multi-line cell keeps two rows", [r["date"] for r in g][:3] == ["10/8/2022", "19/4/2022", ""], str([r["date"] for r in g]))
+    check("multi-line cell asks to check the row count", "ตรวจว่าจำนวนแถวตรงกับในชีต" in st
+          and "warn" in page.get_attribute("#tm-paste-status", "class"), st)
+
+    # several cells pasted into the EDC box go to the table, never into the box
+    paste_at(page, "#tm-edc", "1/3/2022\n8/3/2022\n15/3/2022")
+    check("multi-cell paste in the EDC box goes to the table", page.input_value("#tm-edc") == "22/08/2022"
+          and [r["date"] for r in grid(page)][:3] == ["1/3/2022", "8/3/2022", "15/3/2022"], page.input_value("#tm-edc"))
+    # text without any date, pasted with no box in focus, is refused and the table stays
+    paste_at(page, "#tm-copy", "ชื่อ\nนามสกุล\nที่อยู่")
+    check("paste without dates refused", "ไม่มีวันที่ที่อ่านได้" in text(page, "#tm-paste-status")
+          and [r["date"] for r in grid(page)][:3] == ["1/3/2022", "8/3/2022", "15/3/2022"], text(page, "#tm-paste-status"))
+    # one cell pasted into a date box is an ordinary paste
+    paste_at(page, row_box(4), "22/3/2022")
+    check("single-cell paste fills one box", grid(page)[3]["date"] == "22/3/2022" and len(grid(page)) == 6, str(grid(page)[3]))
+
+    # clear for the next woman
+    page.click("#tm-clear")
+    g = grid(page)
+    check("clear empties everything", page.input_value("#tm-edc") == "" and len(g) == 6 and all(r["date"] == "" for r in g)
+          and text(page, "#tm-paste-status") == "" and text(page, "#tm-copy-status") == "" and not page.locator("#tm-stale").is_visible())
+    check("clear puts the cursor in the EDC box", page.evaluate("document.activeElement.id") == "tm-edc")
+
+    # reference as GA on a date: "12+0" typed into the weeks box is split, the EDC comes out the same
+    page.fill("#tm-ga-w", "12+0")
+    check("weeks box split", page.input_value("#tm-ga-w") == "12" and page.input_value("#tm-ga-d") == "0",
+          page.input_value("#tm-ga-w") + "/" + page.input_value("#tm-ga-d"))
+    check("typing a GA selects that reference", page.is_checked("#tm-by-ga") and not page.is_checked("#tm-by-edc"))
+    check("asks for the date", text(page, "#tm-anchor-echo") == "ใส่วันที่ที่ GA เท่ากับ 12+0", text(page, "#tm-anchor-echo"))
+    page.fill("#tm-ga-date", "2/3/2022")
+    page.press("#tm-ga-date", "Enter")
+    echo = text(page, "#tm-anchor-echo")
+    check("GA reference echo", echo == "EDC ที่ใช้ วันพุธที่ 14 กันยายน พ.ศ. 2565 คิดจาก GA 12+0 ณ พ. 2 มี.ค. 2565", echo)
+    check("Enter after the GA date moves to row 1", page.evaluate(FOCUS_ROW_JS) == 0)
+    put_clip(page, "\n".join(EX_DATES))
+    page.keyboard.press("Control+V")
+    check("GA reference gives the same rows", wd(grid(page)) == ["8+6", "14+2", "21+0", "28+1", "35+2", "38+6", "", ""], str(wd(grid(page))))
+    page.fill("#tm-ga-d", "7")
+    check("GA days above 6 refused", "วันต้องเป็น 0 ถึง 6" in text(page, "#tm-anchor-echo") and wd(grid(page))[0] == "", text(page, "#tm-anchor-echo"))
+    page.fill("#tm-ga-d", "3")           # 12+3 on 2/3/2022: three days further on
+    check("GA days shift every row", wd(grid(page))[:2] == ["9+2", "14+5"], str(wd(grid(page))))
+    page.fill("#tm-ga-w", "0"); page.fill("#tm-ga-d", "0"); page.fill("#tm-ga-date", "8/12/2021")
+    check("GA 0+0 on the LMP day", wd(grid(page))[:2] == ["8+6", "14+2"] and "วันพุธที่ 14 กันยายน พ.ศ. 2565" in text(page, "#tm-anchor-echo"),
+          str(wd(grid(page))) + text(page, "#tm-anchor-echo"))
+    page.check("#tm-by-edc")               # back to the EDC box, which is empty: rows wait, nothing is guessed
+    g = grid(page)
+    check("empty EDC reference gives no GA", wd(g)[0] == "" and g[0]["cls"] == "st-wait" and g[0]["read"] == "อ. 8 ก.พ. 2565", str(g[0]))
+    check("summary without reference", text(page, "#tm-summary") == "7 แถว ยังไม่มีค่าอ้างอิง", text(page, "#tm-summary"))
+
+    # B.E. dates: same GA, and the EDC is written back in B.E. too
+    page.click("#tm-clear")
+    page.fill("#tm-edc", "14/09/2565")
+    paste_at(page, row_box(1), "08/02/2565\n18 มี.ค. 65\n๔/๕/๒๕๖๕")
+    check("B.E., Thai month and Thai digits", wd(grid(page))[:3] == ["8+6", "14+2", "21+0"], str(wd(grid(page))))
+    page.click("#tm-copy-edc")
+    page.wait_for_timeout(100)
+    check("EDC copied in B.E. when the dates are B.E.", get_clip(page) == "14/09/2565\t8\t6\r\n14/09/2565\t14\t2\r\n14/09/2565\t21\t0", repr(get_clip(page)))
+    # EDC picked from the calendar is shown in B.E.; C.E. dates in the table still decide what is copied
+    page.fill("#tm-edc-picker", "2022-09-14")
+    check("calendar picker fills the EDC box", page.input_value("#tm-edc") == "14/09/2565", page.input_value("#tm-edc"))
+    paste_at(page, row_box(1), "8/2/2022\n18/3/2022")
+    page.click("#tm-copy-edc")
+    page.wait_for_timeout(100)
+    check("EDC copied in C.E. when the dates are C.E.", get_clip(page) == "14/09/2022\t8\t6\r\n14/09/2022\t14\t2", repr(get_clip(page)))
+
+    # typing by hand: Enter and the arrows move between rows, a new row appears, a half-typed date is not an error yet
+    page.click("#tm-clear")
+    page.fill("#tm-edc", "14/9/2022")
+    page.click(row_box(1))
+    page.keyboard.type("8/2/2022")
+    page.keyboard.press("Enter")
+    check("Enter moves down a row", page.evaluate(FOCUS_ROW_JS) == 1)
+    page.keyboard.type("18/3")
+    g = grid(page)
+    check("half-typed date is quiet", g[1]["note"] == "" and g[1]["cls"] == "st-wait" and g[1]["w"] == "", str(g[1]))
+    page.keyboard.press("ArrowUp")
+    g = grid(page)
+    check("leaving the box shows the error", g[1]["cls"] == "st-bad" and g[1]["note"] != "" and page.evaluate(FOCUS_ROW_JS) == 0, str(g[1]))
+    page.keyboard.press("ArrowDown")       # arriving by keyboard selects the box, as in a spreadsheet
+    page.keyboard.press("End")
+    page.keyboard.type("/2022")
+    check("finished date clears the error", wd(grid(page))[:2] == ["8+6", "14+2"] and grid(page)[1]["note"] == "", str(grid(page)[1]))
+    for n in range(3, 7):
+        page.fill(row_box(n), "1/3/2022")
+    check("typing in the last row adds a row", len(grid(page)) == 7, str(len(grid(page))))
+    page.fill(row_box(3), "7/12/2021")
+    g = grid(page)
+    check("date before day 0 left blank with a note", g[2]["w"] == "" and g[2]["note"] == "วันที่อยู่ก่อนเริ่มตั้งครรภ์", str(g[2]))
+    page.fill(row_box(4), "13/10/2022")   # 44+1
+    g = grid(page)
+    check("GA past 44 weeks shown with a note", wd(g)[3] == "44+1" and "เกิน 44 สัปดาห์" in g[3]["note"] and g[3]["cls"] == "st-warn", str(g[3]))
+
+    # the example button, and what the fallbacks do when the clipboard API is refused
+    page.click("#tm-example")
+    check("example fills the table", wd(grid(page)) == ["8+6", "14+2", "21+0", "28+1", "35+2", "38+6", "", ""]
+          and page.input_value("#tm-edc") == "14/09/2022" and "ตัวอย่างสมมติ 7 แถว" in text(page, "#tm-paste-status"), str(wd(grid(page))))
+    put_clip(page, "before")
+    page.evaluate("""(function () {
+      window.__write = navigator.clipboard.writeText.bind(navigator.clipboard);
+      navigator.clipboard.writeText = function () { return Promise.reject(new Error('blocked')); };
+    })()""")
+    page.click("#tm-copy")
+    page.wait_for_timeout(150)
+    check("fallback copy through the text box", "คัดลอกแล้ว 7 แถว" in text(page, "#tm-copy-status")
+          and not page.locator("#tm-copy-fallback").is_visible()
+          and get_clip(page).replace("\r\n", "\n") == EX_COPY.replace("\r\n", "\n"),   # a text box keeps LF only
+          text(page, "#tm-copy-status") + " " + repr(get_clip(page)))
+    page.evaluate("document.execCommand = function () { return false; }")
+    page.click("#tm-copy-edc")
+    page.wait_for_timeout(150)
+    box = page.input_value("#tm-copy-fallback")
+    check("last resort: box left open and selected", page.locator("#tm-copy-fallback").is_visible()
+          and box.split("\n")[0] == "14/09/2022\t8\t6" and len(box.split("\n")) == 7 and "กด Ctrl+C" in text(page, "#tm-copy-status")
+          and page.evaluate("(function () { var b = document.getElementById('tm-copy-fallback'); return document.activeElement === b && b.selectionStart === 0 && b.selectionEnd === b.value.length; })()"),
+          text(page, "#tm-copy-status"))
+    page.evaluate("(function () { navigator.clipboard.writeText = window.__write; delete document.execCommand; })()")
+    page.click("#tm-copy")
+    page.wait_for_timeout(100)
+    check("box closes again once the clipboard works", not page.locator("#tm-copy-fallback").is_visible() and get_clip(page) == EX_COPY)
+
+    # the other mode and the other tab keep what was typed
+    page.click("#mode-file")
+    check("file mode shown on request", page.locator("#research-file").is_visible() and not page.locator("#research-table").is_visible()
+          and page.get_attribute("#mode-file", "aria-pressed") == "true")
+    check("file mode loads its sample", "แถวข้อมูล\n7" in text(page, "#stats"), text(page, "#stats"))
+    page.click("#tab-clinic")
+    page.click("#tab-research")
+    check("research tab reopens in the mode last used", page.locator("#research-file").is_visible())
+    page.click("#mode-table")
+    check("table kept its rows", wd(grid(page))[:2] == ["8+6", "14+2"] and page.input_value("#tm-edc") == "14/09/2022", str(wd(grid(page))))
+
+    # a very long paste is cut at the cap and says so
+    page.click("#tm-clear")
+    page.fill("#tm-edc", "14/9/2022")
+    paste_at(page, row_box(1), "\n".join(["8/2/2022"] * 2010))
+    g = grid(page)
+    check("long paste cut at 2000 rows", len(g) == 2000 and wd(g)[1999] == "8+6" and "ตารางรับได้ 2000 แถว" in text(page, "#tm-paste-status"),
+          str(len(g)) + " " + text(page, "#tm-paste-status"))
+    page.click("#tm-clear")
+
+    # phone: no sideways scroll of the page, and the two results fit on screen
+    page.click("#tm-example")
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.screenshot(path=str(OUT / "table-phone.png"), full_page=True)
+    sw = page.evaluate("document.documentElement.scrollWidth")
+    check("table mode: no horizontal scroll on phone", sw <= 390, str(sw))
+    edge = page.evaluate("document.querySelector('#tm-body tr td:nth-child(5)').getBoundingClientRect().right")
+    check("table mode: ga_days visible on phone", edge <= 390, str(edge))
+    check("no script errors in table mode", page_errors == [], str(page_errors))
+    ctx.close()
+
+    # dark mode
+    ctx = browser.new_context(timezone_id="Asia/Bangkok", color_scheme="dark", viewport={"width": 1280, "height": 900})
+    page = ctx.new_page()
+    page.goto(PAGE, wait_until="domcontentloaded")
+    page.click("#tab-research")
+    page.click("#tm-example")
+    page.screenshot(path=str(OUT / "table-dark.png"), full_page=True)
+    ctx.close()
+
+    # ---------------- 3b. Research tab, file mode ----------------
     ctx = browser.new_context(timezone_id="Asia/Bangkok", locale="th-TH", accept_downloads=True,
                               viewport={"width": 1280, "height": 900})
     page = ctx.new_page()
     page.goto(PAGE, wait_until="domcontentloaded")
     page.click("#tab-research")
+    page.click("#mode-file")
     stats = text(page, "#stats")
     check("sample stats rows", "แถวข้อมูล\n7" in stats, stats)
     check("sample redate count", "ยึด US ตามเกณฑ์\n3" in stats, stats)
@@ -314,7 +627,7 @@ with sync_playwright() as p:
                 ws.cell(r, c).number_format = "dd/mm/yyyy"
     wb.save(xin)
     page.set_input_files("#file", str(xin))
-    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'anc_export.xlsx'")
+    wait_until(page, "!!(PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'anc_export.xlsx')")
     st = page.evaluate("PregWheel.research._state")
     check("xlsx header row 2", page.input_value("#header-row") == "2", page.input_value("#header-row"))
     check("xlsx map lmp", st["mapping"]["lmp"] == 2, str(st["mapping"]))
@@ -341,7 +654,7 @@ with sync_playwright() as p:
     cin = OUT / "tis620.csv"
     cin.write_bytes("เลขที่,LMP,วันที่ตรวจ\r\nB1,01/06/2569,30/09/2569\r\n".encode("cp874"))
     page.set_input_files("#file", str(cin))
-    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'tis620.csv'")
+    wait_until(page, "!!(PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'tis620.csv')")
     info = text(page, "#file-info")
     check("cp874 decoded", "Windows-874" in info, info)
     prev = text(page, "#preview")
@@ -352,7 +665,7 @@ with sync_playwright() as p:
     cfl.write_text("ID,LMP,US date,US GA,วันที่ตรวจ\r\nC1,01/09/2569,16/08/2569,12+0,30/09/2569\r\n"
                    "C2,01/07/2563,01/09/2563,7+5,01/09/2563\r\n", encoding="utf-8")
     page.set_input_files("#file", str(cfl))
-    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'conflict.csv'")
+    wait_until(page, "!!(PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'conflict.csv')")
     stats = text(page, "#stats")
     check("conflict row counted as US", "ยึด US ตามเกณฑ์\n2" in stats and "LMP ใช้ไม่ได้ 1" in stats, stats)
     prev = text(page, "#preview")
@@ -394,6 +707,7 @@ base = f"http://127.0.0.1:{srv.server_address[1]}/index.html"
 with sync_playwright() as p:
     browser = p.chromium.launch()
     ctx = browser.new_context(timezone_id="Asia/Bangkok", accept_downloads=True)
+    ctx.grant_permissions(["clipboard-read", "clipboard-write"])
     ctx.add_init_script(CSP_WATCH)
     page = ctx.new_page()
     external = []
@@ -406,8 +720,21 @@ with sync_playwright() as p:
     page.click("#btn-example")
     check("app works under CSP", report(page) == "GA 7+5 Wk by U/S ≠ date at GA 7+5 wk", str(report(page)))
     page.click("#tab-research")
+    # table mode under the policy: type the EDC, paste a column, copy both ways
+    page.fill("#tm-edc", "14/9/2022")
+    paste_at(page, row_box(1), "8/2/2022\n18/3/2022\n20/10/2023")
+    check("table mode works under CSP", wd(grid(page))[:3] == ["8+6", "14+2", ""], str(wd(grid(page))))
+    page.click("#tm-copy")
+    page.wait_for_timeout(100)
+    check("copy works under CSP", get_clip(page) == "8\t6\r\n14\t2\r\n\t", repr(get_clip(page)))
+    page.click("#tm-copy-edc")
+    page.wait_for_timeout(100)
+    check("copy with EDC works under CSP", get_clip(page).split("\r\n")[0] == "14/09/2022\t8\t6", repr(get_clip(page)))
+    page.click("#tm-example")
+    page.click("#tm-clear")
+    page.click("#mode-file")
     page.set_input_files("#file", str(xin))
-    page.wait_for_function("PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'anc_export.xlsx'")
+    wait_until(page, "!!(PregWheel.research._state.src && PregWheel.research._state.src.fileName === 'anc_export.xlsx')")
     with page.expect_download():
         page.click("#dl-xlsx")
     with page.expect_download():

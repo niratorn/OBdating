@@ -46,6 +46,7 @@
 
   var MS_PER_DAY = 86400000;
   var MAX_INPUT_CHARS = 60;       // longer text is never a date or GA; refusing it keeps the regexes fast
+  var MAX_TABLE_ROWS = 2000;      // table mode keeps this many rows; a longer paste is cut and the page says so
   var EXCEL_EPOCH_OFFSET = 25569; // Excel serial of 1970-01-01 (1900 date system)
   var EXCEL_1904_SHIFT = 1462;    // days between the 1900 and 1904 date systems
   var EXCEL_MAX_SERIAL = 2958465; // 9999-12-31
@@ -119,6 +120,15 @@
     var p = ymdFromDay(n);
     return pad2(p.d) + '/' + pad2(p.m) + '/' + (p.y + BE_OFFSET);
   }
+
+  function fmtDMYCE(n) {
+    if (n == null) return '';
+    var p = ymdFromDay(n);
+    return pad2(p.d) + '/' + pad2(p.m) + '/' + p.y;
+  }
+
+  // dd/mm/yyyy in the calendar asked for: 'CE', or B.E. for anything else.
+  function fmtDMYEra(n, era) { return era === 'CE' ? fmtDMYCE(n) : fmtDMYBE(n); }
 
   function fmtISO(n) {
     if (n == null) return '';
@@ -674,15 +684,160 @@
     return cells;
   }
 
+  /* ------------------------------------------------------------------
+   * Table mode (research tab): one pregnancy, many service dates
+   * The EDC is given by the user, either directly or as "GA w+d on a date", and is
+   * taken as final: no LMP versus U/S rule runs here. Each service date gets GA in
+   * weeks and days, in the same row order, for pasting back beside the dates in a
+   * spreadsheet. A row that cannot be calculated stays in place with blank cells.
+   * ------------------------------------------------------------------ */
+
+  // The two boxes of "GA [weeks] [days] on a date". "12+3" or "12w3d" typed into the weeks
+  // box is accepted and reported as split, so the page can fill both boxes.
+  // Unlike a U/S reading, 0+0 is allowed: it means the date is the first day of the LMP.
+  // soft: the text may simply be unfinished, so the page waits until the box is left.
+  function parseAnchorGA(wRaw, dRaw) {
+    var ws = normalizeDigits(wRaw == null ? '' : wRaw).trim();
+    var ds = normalizeDigits(dRaw == null ? '' : dRaw).trim();
+    if (ws.length > MAX_INPUT_CHARS || ds.length > MAX_INPUT_CHARS) return { ok: false, field: 'w', error: 'ข้อความยาวเกินไป' };
+    if (!ws && !ds) return { ok: false, empty: true };
+    var w, d, split = false;
+    if (/[^\d]/.test(ws)) {
+      var m = ws.match(/^(\d{1,2})\s*\+\s*(\d)$/);
+      if (m) { w = parseInt(m[1], 10); d = parseInt(m[2], 10); }
+      else {
+        var g = parseGA(ws, {});
+        if (!g.ok) return { ok: false, soft: true, field: 'w', error: 'พิมพ์สัปดาห์เป็นตัวเลข เช่น 12 แล้วใส่วันในช่องถัดไป' };
+        w = Math.floor(g.days / 7); d = g.days - w * 7;
+      }
+      split = true;
+    } else {
+      if (!ws) return { ok: false, soft: true, field: 'w', error: 'ใส่จำนวนสัปดาห์' };
+      if (!/^\d*$/.test(ds)) return { ok: false, field: 'd', error: 'วันต้องเป็น 0 ถึง 6' };
+      w = parseInt(ws, 10); d = ds ? parseInt(ds, 10) : 0;
+    }
+    if (d > 6) return { ok: false, field: 'd', error: 'วันต้องเป็น 0 ถึง 6' };
+    if (w * 7 + d > MAX_GA_DAYS) return { ok: false, field: 'w', error: 'GA ต้องไม่เกิน ' + fmtWD(MAX_GA_DAYS) };
+    return { ok: true, days: w * 7 + d, w: w, d: d, split: split };
+  }
+
+  // EDC from a GA that is known on any date (same arithmetic as a U/S reading).
+  function edcFromGAOn(day, gaDays) { return edcFromUS(day, gaDays); }
+
+  var TABLE_NOTE = {
+    BEFORE: 'วันที่อยู่ก่อนเริ่มตั้งครรภ์',
+    BEYOND: 'GA เกิน ' + fmtWD(MAX_GA_DAYS) + ' สัปดาห์',
+    LATE: 'GA เกิน ' + (WARN_GA_DAYS / 7) + ' สัปดาห์ ตรวจสอบวันที่'
+  };
+
+  // GA on one service date, counted from the EDC in use.
+  // status: 'empty' no text
+  //         'bad'   no GA: the date is unreadable (unread: true), before day 0 of the EDC,
+  //                 or beyond MAX_GA_DAYS. Given no GA on purpose, so that a date from another
+  //                 pregnancy or a typing error never reaches the sheet as a number.
+  //         'wait'  the date is readable but no EDC has been given yet
+  //         'ok'    GA in gaDays
+  //         'warn'  GA in gaDays, beyond WARN_GA_DAYS: shown, with a note to check the date
+  function gaForDate(edcDay, raw, opts) {
+    var p = parseDateValue(raw, opts || {});
+    if (p.empty) return { status: 'empty', day: null, era: null, gaDays: null, note: '' };
+    if (!p.ok) return { status: 'bad', unread: true, day: null, era: null, gaDays: null, note: p.error };
+    if (edcDay == null) return { status: 'wait', day: p.day, era: p.era, gaDays: null, note: '' };
+    var ga = gaOn(edcDay, p.day);
+    if (ga < 0) return { status: 'bad', day: p.day, era: p.era, gaDays: null, note: TABLE_NOTE.BEFORE };
+    if (ga > MAX_GA_DAYS) return { status: 'bad', day: p.day, era: p.era, gaDays: null, note: TABLE_NOTE.BEYOND };
+    var late = ga > WARN_GA_DAYS;
+    return { status: late ? 'warn' : 'ok', day: p.day, era: p.era, gaDays: ga, note: late ? TABLE_NOTE.LATE : '' };
+  }
+
+  // The calendar most of the readable dates were written in: 'BE', 'CE', or null when there
+  // is none or a tie. An EDC sent back to the sheet is written in the same calendar.
+  function majorityEra(results) {
+    var be = 0, ce = 0;
+    (results || []).forEach(function (r) {
+      if (!r || r.day == null) return;
+      if (r.era === 'BE') be++; else if (r.era === 'CE') ce++;
+    });
+    return be > ce ? 'BE' : (ce > be ? 'CE' : null);
+  }
+
+  // Text for the clipboard: one line per table row, tab between cells, CR LF between rows,
+  // which Google Sheets and Excel both paste as cells. Rows after the last row that has any
+  // text are left out. A row without a GA becomes empty cells, so the rows never shift.
+  // opts.edcText: when given, an EDC cell goes in front of ga_week and ga_days on rows that have a GA.
+  function tableClipboardText(results, opts) {
+    opts = opts || {};
+    var last = -1, i;
+    for (i = 0; i < results.length; i++) if (results[i] && results[i].status !== 'empty') last = i;
+    var lines = [], filled = 0;
+    for (i = 0; i <= last; i++) {
+      var r = results[i], has = !!r && r.gaDays != null;
+      var wd = has ? splitWD(r.gaDays) : null;
+      var cells = has ? [String(wd.w), String(wd.d)] : ['', ''];
+      if (opts.edcText != null) cells.unshift(has ? opts.edcText : '');
+      if (has) filled++;
+      lines.push(cells.join('\t'));
+    }
+    return { text: lines.join('\r\n'), rows: lines.length, filled: filled, blank: lines.length - filled };
+  }
+
+  // Text copied from Google Sheets or Excel: rows end with a line break, cells are separated
+  // by tabs, and a cell that holds a line break is quoted. When several columns were copied,
+  // the column with the most readable dates is taken as the service date (the leftmost on a tie).
+  // Empty rows inside the block are kept, because the results must line up with the sheet rows;
+  // empty rows at the end are dropped. dates: how many of the kept values read as a date.
+  // multiline: a cell held a line break or a stray quote mark, so the page asks the user to
+  // check that the number of rows matches the sheet.
+  function parsePastedDates(text, opts) {
+    text = String(text == null ? '' : text);
+    var hasBreak = function (v) { return /[\r\n]/.test(v); };
+    var grid = parseCSV(text, '\t');
+    // A cell that begins with a quote mark without being a quoted cell makes the parser
+    // swallow the cells and rows after it, which would shift every row below. A real quoted
+    // cell never holds a tab, so a field with both a line break and a tab gives that away:
+    // the text is then read again line by line, every quote mark taken as an ordinary character.
+    var swallowed = grid.some(function (r) {
+      return r.some(function (v) { return hasBreak(v) && v.indexOf('\t') >= 0; });
+    });
+    if (swallowed) {
+      var plain = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;   // a byte-order mark is not data
+      var lines = plain.split(/\r\n|\n|\r/);
+      if (lines.length && lines[lines.length - 1] === '') lines.pop();
+      grid = lines.map(function (l) { return l.split('\t'); });
+    }
+    var multiline = swallowed || grid.some(function (r) { return r.some(hasBreak); });
+    var cols = grid.reduce(function (m, r) { return Math.max(m, r.length); }, 0);
+    var col = 0;
+    if (cols > 1) {
+      var best = -1;
+      for (var j = 0; j < cols; j++) {
+        var n = 0;
+        for (var i = 0; i < grid.length && i < MAX_TABLE_ROWS; i++) {
+          if (parseDateValue(grid[i][j], opts || {}).ok) n++;
+        }
+        if (n > best) { best = n; col = j; }
+      }
+    }
+    var values = grid.map(function (r) {
+      var v = r[col];
+      return v == null ? '' : String(v).replace(/\s+/g, ' ').trim();
+    });
+    while (values.length && values[values.length - 1] === '') values.pop();
+    var total = values.length;
+    if (total > MAX_TABLE_ROWS) values = values.slice(0, MAX_TABLE_ROWS);
+    var dates = values.filter(function (v) { return parseDateValue(v, opts || {}).ok; }).length;
+    return { values: values, cols: cols, col: col, total: total, cut: total > values.length, dates: dates, multiline: multiline };
+  }
+
   function dayToExcelSerial(day) { return day + EXCEL_EPOCH_OFFSET; }
 
   return {
     DAYS_LMP_TO_EDC: DAYS_LMP_TO_EDC, REDATING_BANDS: REDATING_BANDS, MAX_GA_DAYS: MAX_GA_DAYS,
-    WARN_GA_DAYS: WARN_GA_DAYS, BE_OFFSET: BE_OFFSET,
+    WARN_GA_DAYS: WARN_GA_DAYS, BE_OFFSET: BE_OFFSET, MAX_TABLE_ROWS: MAX_TABLE_ROWS,
     TH_MONTHS: TH_MONTHS, TH_MONTHS_ABBR: TH_MONTHS_ABBR, TH_WEEKDAYS: TH_WEEKDAYS,
     dayFromYMD: dayFromYMD, ymdFromDay: ymdFromDay, localToday: localToday,
     msUntilNextLocalMidnight: msUntilNextLocalMidnight, weekdayIndex: weekdayIndex,
-    fmtThai: fmtThai, fmtThaiLong: fmtThaiLong, fmtDMYBE: fmtDMYBE, fmtISO: fmtISO,
+    fmtThai: fmtThai, fmtThaiLong: fmtThaiLong, fmtDMYBE: fmtDMYBE, fmtDMYCE: fmtDMYCE, fmtDMYEra: fmtDMYEra, fmtISO: fmtISO,
     splitWD: splitWD, fmtWD: fmtWD, fmtWDThai: fmtWDThai, trimesterOf: trimesterOf,
     normalizeDigits: normalizeDigits, parseDateText: parseDateText, parseDateValue: parseDateValue,
     parseGA: parseGA, gaFromWD: gaFromWD,
@@ -691,6 +846,8 @@
     reportLine: reportLine, naegeleEDC: naegeleEDC, checkBookEDC: checkBookEDC,
     decodeText: decodeText, parseCSV: parseCSV, toCSV: toCSV,
     processRow: processRow, outputHeaders: outputHeaders, outputCells: outputCells,
+    parseAnchorGA: parseAnchorGA, edcFromGAOn: edcFromGAOn, TABLE_NOTE: TABLE_NOTE, gaForDate: gaForDate,
+    majorityEra: majorityEra, tableClipboardText: tableClipboardText, parsePastedDates: parsePastedDates,
     dayToExcelSerial: dayToExcelSerial, isEmptyCell: isEmptyCell
   };
 });
