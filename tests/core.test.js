@@ -428,6 +428,13 @@ test('CSV round trip', function () {
   var rows = [['id', 'LMP'], ['A,1', 'x "y"'], ['A2', ' lead']];
   assert.deepStrictEqual(C.parseCSV(C.toCSV(rows)), rows);
 });
+test('CSV output starts with one byte-order mark, which Excel needs to read Thai as UTF-8', function () {
+  // The mark in toCSV() is an invisible literal in src/core.js. Retyping that line drops it,
+  // and the round trip above still passes, because parseCSV strips the mark when it is there.
+  var out = C.toCSV([['id', 'หมายเหตุ']]);
+  assert.strictEqual(out.charCodeAt(0), 0xFEFF);
+  assert.strictEqual(out.slice(1), 'id,หมายเหตุ' + String.fromCharCode(13, 10));
+});
 test('decode UTF-8 and Windows-874', function () {
   var utf = C.decodeText(Buffer.from('ก.ย.', 'utf8'));
   assert.strictEqual(utf.text, 'ก.ย.');
